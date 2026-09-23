@@ -44,6 +44,29 @@ def criar_manejo(dados):
 def listar_manejos():
     return manejos
 
+def buscar_manejo(id):
+    return next(
+        (manejo for manejo in manejos if manejo["id"] == id),
+        None
+    )
+
+
+def atualizar_manejo(id, dados):
+    manejo = buscar_manejo(id)
+
+    if manejo:
+        manejo.update(dados)
+
+    return manejo
+
+
+def remover_manejo(id):
+    global manejos
+    manejos[:] = [
+        manejo for manejo in manejos
+        if manejo.get("id") != id
+    ]
+
 # Rota de Registro de Manejo
 @app.route("/manejo", methods=["GET", "POST"])
 def manejo():
@@ -59,6 +82,34 @@ def manejo():
         })
         return redirect(url_for("listagem"))
     return render_template("manejo.html")
+
+@app.route("/manejo/atualizar/<int:id>", methods=["GET", "POST"])
+def atualizar_manejo_route(id):
+    registro = buscar_manejo(id)
+
+    if registro is None:
+        return redirect(url_for("listagem"))
+
+    if request.method == "POST":
+        atualizar_manejo(id, {
+            "animal": request.form.get("animal"),
+            "tipo_manejo": request.form.get("tipo_manejo"),
+            "data_manejo": request.form.get("data_manejo"),
+            "produto": request.form.get("produto"),
+            "dose": request.form.get("dose"),
+            "responsavel": request.form.get("responsavel"),
+            "observacoes": request.form.get("observacoes")
+        })
+
+        return redirect(url_for("listagem"))
+
+    return render_template("manejo.html", registro=registro)
+
+
+@app.route("/manejo/remover/<int:id>", methods=["POST"])
+def remover_manejo_route(id):
+    remover_manejo(id)
+    return redirect(url_for("listagem"))
 
 # Atualize a rota de listagem existente para enviar também os manejos
 @app.route("/listagem")
