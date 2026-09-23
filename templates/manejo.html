@@ -1,32 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}Manejo Sanitário{% endblock %}
+{% block title %}
+    {% if registro %}Editar Manejo{% else %}Manejo Sanitário{% endif %}
+{% endblock %}
 
 {% block content %}
-<h2>Registro de Manejo Sanitário</h2>
 
-<form method="POST" action="{{ url_for('manejo') }}">
+<h2>
+    {% if registro %}
+        Editar Manejo Sanitário
+    {% else %}
+        Registro de Manejo Sanitário
+    {% endif %}
+</h2>
+
+<form method="POST">
+
     <label>Animal / Identificação:</label>
-    <input type="text" name="animal" required>
+    <input
+        type="text"
+        name="animal"
+        value="{{ registro.animal if registro else '' }}"
+        required
+    >
 
     <label>Tipo de Manejo:</label>
-    <input type="text" name="tipo_manejo" placeholder="Ex: Vermifugação, Pesagem" required>
+    <input
+        type="text"
+        name="tipo_manejo"
+        placeholder="Ex: Vermifugação, Pesagem"
+        value="{{ registro.tipo_manejo if registro else '' }}"
+        required
+    >
 
     <label>Data do Manejo:</label>
-    <input type="date" name="data_manejo" required>
+    <input
+        type="date"
+        name="data_manejo"
+        value="{{ registro.data_manejo if registro else '' }}"
+        required
+    >
 
     <label>Produto Aplicado:</label>
-    <input type="text" name="produto">
+    <input
+        type="text"
+        name="produto"
+        value="{{ registro.produto if registro else '' }}"
+    >
 
     <label>Dose:</label>
-    <input type="text" name="dose">
+    <input
+        type="text"
+        name="dose"
+        value="{{ registro.dose if registro else '' }}"
+    >
 
     <label>Responsável:</label>
-    <input type="text" name="responsavel" required>
+    <input
+        type="text"
+        name="responsavel"
+        value="{{ registro.responsavel if registro else '' }}"
+        required
+    >
 
     <label>Observações:</label>
-    <textarea name="observacoes"></textarea>
+    <textarea name="observacoes">{{ registro.observacoes if registro else '' }}</textarea>
 
-    <button type="submit">Salvar Manejo</button>
+    <button type="submit">
+        {% if registro %}
+            Salvar Alterações
+        {% else %}
+            Salvar Manejo
+        {% endif %}
+    </button>
+
 </form>
+
 {% endblock %}

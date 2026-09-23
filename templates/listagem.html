@@ -130,6 +130,7 @@
             <th>Produto</th>
             <th>Dose</th>
             <th>Responsável</th>
+            <th>Ações</th>
         </tr>
     </thead>
     <tbody>
@@ -142,11 +143,27 @@
             <td>{{ m.produto }}</td>
             <td>{{ m.dose }}</td>
             <td>{{ m.responsavel }}</td>
+            <td>
+    <a href="{{ url_for('atualizar_manejo_route', id=m.id) }}">
+        Editar
+    </a>
+
+    <form
+        action="{{ url_for('remover_manejo_route', id=m.id) }}"
+        method="POST"
+        onsubmit="return confirm('Remover este manejo?');"
+        class="inline-form"
+    >
+        <button type="submit" class="link-danger">
+            Remover
+        </button>
+    </form>
+</td>
         </tr>
         {% endfor %}
         {% else %}
         <tr>
-            <td colspan="6">Nenhum manejo registrado</td>
+            <td colspan="7">Nenhum manejo registrado</td>
         </tr>
         {% endif %}
     </tbody>
