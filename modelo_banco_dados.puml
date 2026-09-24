@@ -1,76 +1,40 @@
 @startuml
-title Modelo de Banco de Dados - AGROSAN
 
+title Modelo de Banco de Dados - MediAgro
 
-hide methods
-hide stereotypes
-
-skinparam linetype ortho
-
-entity "ANIMAIS" as animais {
+entity "animais" as animais {
     * id : INTEGER <<PK>>
     --
-    identificacao : TEXT <<NOT NULL>>
-    especie : TEXT <<NOT NULL>>
-    raca : TEXT
-    sexo : TEXT
-    data_nascimento : DATE
-    lote_id : INTEGER <<FK>>
-    criado_em : TIMESTAMP
-}
-
-entity "LOTES" as lotes {
-    * id : INTEGER <<PK>>
-    --
-    codigo : TEXT <<NOT NULL>>
-    quantidade : INTEGER
+    identificacao : TEXT
     especie : TEXT
-    data_formacao : DATE
-    criado_em : TIMESTAMP
+    raca : TEXT
+    data_nascimento : TEXT
 }
 
-entity "VACINACOES" as vacinacoes {
+entity "vacinacoes" as vacinacoes {
     * id : INTEGER <<PK>>
     --
-    animal_id : INTEGER <<FK>>
-    vacina : TEXT <<NOT NULL>>
-    lote_vacina : TEXT
+    animal : TEXT
+    vacina : TEXT
+    lote : TEXT
     fabricante : TEXT
-    data_aplicacao : DATE <<NOT NULL>>
-    proxima_dose : DATE
-    dose : TEXT <<NOT NULL>>
-    responsavel : TEXT <<NOT NULL>>
+    data_aplicacao : TEXT
+    proxima_dose : TEXT
+    dose : TEXT
+    responsavel : TEXT
     observacoes : TEXT
-    criado_em : TIMESTAMP
 }
 
-entity "USUARIOS" as usuarios {
+entity "manejos" as manejos {
     * id : INTEGER <<PK>>
     --
-    nome : TEXT <<NOT NULL>>
-    usuario : TEXT <<UNIQUE>>
-    senha : TEXT
-    perfil : TEXT
-    criado_em : TIMESTAMP
-}
-
-entity "MANEJOS_SANITARIOS" as manejos {
-    * id : INTEGER <<PK>>
-    --
-    animal_id : INTEGER <<FK>>
-    tipo_manejo : TEXT <<NOT NULL>>
-    data_manejo : DATE <<NOT NULL>>
+    animal : TEXT
+    tipo_manejo : TEXT
+    data_manejo : TEXT
     produto : TEXT
     dose : TEXT
     responsavel : TEXT
     observacoes : TEXT
-    criado_em : TIMESTAMP
 }
-
-lotes ||--o{ animais : "possui"
-
-animais ||--o{ vacinacoes : "recebe"
-
-animais ||--o{ manejos : "possui"
 
 @enduml

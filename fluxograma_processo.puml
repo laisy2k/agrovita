@@ -1,58 +1,35 @@
-' Autor: Guilherme da Silva
 @startuml
-title Fluxo do Sistema - Controle de Vacinação
 
-|Usuário|
+title Fluxo de Dados - MediAgro
+
 start
 
-:Acessar Controle de Vacinação;
+:Usuário acessa o MediAgro;
 
-|Sistema|
-:Exibir formulário de vacinação;
+:Escolhe uma funcionalidade;
 
-|Usuário|
-:Preencher dados;
-:Enviar formulário;
+if (Qual operação?) then (Registrar)
+    :Preenche o formulário;
+    :Flask recebe os dados;
+    :Salva os dados no SQLite;
 
-|Sistema|
-:Validar dados;
+elseif (Editar)
+    :Seleciona um registro;
+    :Altera os dados;
+    :Flask atualiza os dados no SQLite;
 
-if (Dados obrigatórios válidos?) then (Não)
-    :Informar campos obrigatórios;
-    :Retornar formulário;
-    stop
-else (Sim)
+elseif (Excluir)
+    :Seleciona um registro;
+    :Confirma a exclusão;
+    :Flask remove os dados do SQLite;
+
+else (Consultar)
+    :Flask consulta os dados no SQLite;
 endif
 
-if (Data da próxima dose\né válida?) then (Não)
-    :Informar erro de data;
-    :Retornar formulário;
-    stop
-else (Sim)
-endif
+:Sistema exibe os dados atualizados;
 
-|Banco de Dados|
-:Inserir registro\nna tabela vacinacoes;
-
-if (Registro salvo?) then (Não)
-    |Sistema|
-    :Informar erro ao salvar;
-    stop
-else (Sim)
-endif
-
-|Sistema|
-:Confirmar vacinação registrada;
-:Consultar vacinações cadastradas;
-
-|Banco de Dados|
-:Retornar registros;
-
-|Sistema|
-:Exibir listagem de vacinações;
-
-|Usuário|
-:Visualizar histórico;
+:Usuário visualiza registros,\ncontadores ou Dashboard;
 
 stop
 
