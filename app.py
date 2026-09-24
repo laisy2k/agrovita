@@ -425,26 +425,6 @@ def inicio():
         total_manejos=total_manejos
     )
 
-#Cadastro de Lotes
-
-@app.route('/lotes', methods=['GET', 'POST'])
-def lotes():
-    if request.method == "POST":
-        codigo = request.form.get("codigo")
-        quantidade = request.form.get("quantidade")
-        especie = request.form.get("especie")
-        data_formacao = request.form.get("data_formacao")
-
-        print("Novo lote cadastrado:")
-        print(f"Código: {codigo}")
-        print(f"Quantidade de animais: {quantidade}")
-        print(f"Espécie: {especie}")
-        print(f"Data de formação: {data_formacao}")
-
-        return redirect(url_for("listagem"))
-
-    return render_template("lotes.html")
-
 
 # Cadastro de animal
 @app.route("/cadastro", methods=["GET", "POST"])
@@ -542,17 +522,6 @@ def atualizar_vacinacao_route(id):
 def remover_vacinacao_route(id):
     remover_vacinacao(id)
     return redirect(url_for("listagem"))
-
-
-# Listagem
-@app.route("/listagemvacina")
-def listagemvacina():
-    return render_template("listagemvacina.html", vacinacoes=listar_vacinacoes())
-
-# Atualização
-@app.route("/atualizar")
-def atualizar():
-    return render_template("atualizar.html")
 
 @app.route("/dashboard")
 def dashboard():

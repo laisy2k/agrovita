@@ -526,3 +526,34 @@ tr:hover {
         font-size: 13px;
     }
 }
+
+/* Ações das tabelas */
+.inline-form {
+    display: inline !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+.inline-form .link-danger {
+    display: inline !important;
+    width: auto !important;
+    margin: 0 0 0 12px !important;
+    padding: 0 !important;
+
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    color: #c62828 !important;
+    text-decoration: underline;
+    font: inherit;
+    cursor: pointer;
+}
+
+.inline-form .link-danger:hover {
+    background: transparent !important;
+    color: #8e0000 !important;
+}
