@@ -1,10 +1,15 @@
 from flask import Flask, render_template, request, redirect, url_for
 from datetime import date
-import sqlite3
+import sqlite3 
+import os
+
 app = Flask(__name__)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CAMINHO_BANCO = os.path.join(BASE_DIR, "mediagro.db")
+
 def conectar_banco():
-    conexao = sqlite3.connect("mediagro.db")
+    conexao = sqlite3.connect(CAMINHO_BANCO)
     conexao.row_factory = sqlite3.Row
     return conexao
 
