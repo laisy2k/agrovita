@@ -1,10 +1,10 @@
 @startuml
 
-title Fluxo de Dados - MediAgro
+title Fluxo de Dados - AgroVita
 
 start
 
-:Usuário acessa o MediAgro;
+:Usuário acessa o AgroVita;
 
 :Escolhe uma funcionalidade;
 

@@ -1,12 +1,12 @@
 @startuml
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
-title Diagrama de Contexto - MediAgro
+title Diagrama de Contexto - AgroVita
 
 Person(usuario, "Usuário", "Responsável pelo controle sanitário dos animais.")
 
-System(mediagro, "MediAgro", "Sistema web para controle de animais, vacinações e manejos sanitários.")
+System(agrovita, "AgroVita", "Sistema web para controle de animais, vacinações e manejos sanitários.")
 
-Rel(usuario, mediagro, "Utiliza para registrar e acompanhar animais, vacinações e manejos")
+Rel(usuario, agrovita, "Utiliza para registrar e acompanhar animais, vacinações e manejos")
 
 @enduml

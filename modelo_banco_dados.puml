@@ -1,6 +1,6 @@
 @startuml
 
-title Modelo de Banco de Dados - MediAgro
+title Modelo de Banco de Dados - AgroVita
 
 entity "animais" as animais {
     * id : INTEGER <<PK>>

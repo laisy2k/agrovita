@@ -1,11 +1,11 @@
-# MediAgro — Controle de Manejo Sanitário e Vacinação
+# AgroVita — Controle de Manejo Sanitário e Vacinação
 🌐 **Aplicação online:** https://laisy2k.pythonanywhere.com/
 
 Sistema web desenvolvido para auxiliar no controle sanitário de animais, permitindo organizar informações sobre animais, vacinações e manejos sanitários em um único ambiente.
 
 ## Sobre o projeto
 
-O MediAgro foi desenvolvido com o objetivo de facilitar o registro e acompanhamento de informações relacionadas à saúde e ao manejo dos animais de uma propriedade rural.
+O AgroVita foi desenvolvido com o objetivo de facilitar o registro e acompanhamento de informações relacionadas à saúde e ao manejo dos animais de uma propriedade rural.
 
 O sistema permite manter os registros organizados, acompanhar vacinações e consultar informações por meio de um Dashboard.
 
@@ -111,4 +111,4 @@ O desenvolvimento foi organizado utilizando Issues, branches, Pull Requests e um
 
 ## Desenvolvedora
 
-**Kezia Laís** — Desenvolvimento do projeto MediAgro.
+**Kezia Laís** — Desenvolvimento do projeto AgroVita.

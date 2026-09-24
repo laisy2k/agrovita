@@ -1,11 +1,11 @@
 @startuml
 !includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title Diagrama de Contêiner - MediAgro
+title Diagrama de Contêiner - AgroVita
 
 Person(usuario, "Usuário", "Responsável pelo controle sanitário dos animais.")
 
-System_Boundary(mediagro, "MediAgro") {
+System_Boundary(agrovita, "AgroVita") {
 
     Container(web, "Aplicação Web", "Python, Flask, HTML, CSS", "Permite cadastrar, listar, editar e excluir animais, vacinações e manejos sanitários, além de visualizar o Dashboard.")
 
