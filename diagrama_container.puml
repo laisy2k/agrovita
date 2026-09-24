@@ -1,19 +1,18 @@
-' Autor: Kezia Las
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-@startuml Container Diagrama
-title Diagrama de Contêiner
+title Diagrama de Contêiner - MediAgro
 
-package "Sistema Web" {
+Person(usuario, "Usuário", "Responsável pelo controle sanitário dos animais.")
 
-  [Interface Web\nHTML/CSS]
-  [Servidor\nPython/Flask]
-  database "Banco de Dados"
+System_Boundary(mediagro, "MediAgro") {
 
+    Container(web, "Aplicação Web", "Python, Flask, HTML, CSS", "Permite cadastrar, listar, editar e excluir animais, vacinações e manejos sanitários, além de visualizar o Dashboard.")
+
+    ContainerDb(banco, "Banco de Dados", "SQLite", "Armazena os dados de animais, vacinações e manejos sanitários.")
 }
 
-[Interface Web\nHTML/CSS] --> [Servidor\nPython/Flask] : Requisições HTTP
-[Servidor\nPython/Flask] --> "Banco de Dados" : CRUD
-"Banco de Dados" --> [Servidor\nPython/Flask]
-[Servidor\nPython/Flask] --> [Interface Web\nHTML/CSS] : Respostas
+Rel(usuario, web, "Utiliza", "Navegador Web")
+Rel(web, banco, "Lê e grava dados")
 
 @enduml
