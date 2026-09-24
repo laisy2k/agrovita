@@ -1,4 +1,5 @@
 # MediAgro — Controle de Manejo Sanitário e Vacinação
+🌐 **Aplicação online:** https://laisy2k.pythonanywhere.com/
 
 Sistema web desenvolvido para auxiliar no controle sanitário de animais, permitindo organizar informações sobre animais, vacinações e manejos sanitários em um único ambiente.
 
