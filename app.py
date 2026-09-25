@@ -1,9 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 from datetime import date
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3 
 import os
+from functools import wraps
 
 app = Flask(__name__)
+app.secret_key = "agrovita-chave-secreta"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_BANCO = os.path.join(BASE_DIR, "mediagro.db")
@@ -55,6 +58,30 @@ def criar_tabelas():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            senha TEXT NOT NULL,
+            tipo TEXT NOT NULL DEFAULT 'usuario'
+        )
+    """)
+
+    cursor.execute(
+        "SELECT * FROM usuarios WHERE email = ?",
+        ("admin@agrovita.com",)
+    )
+    admin = cursor.fetchone()
+
+    if admin is None:
+        senha_hash = generate_password_hash("admin123")
+
+        cursor.execute("""
+            INSERT INTO usuarios (nome, email, senha, tipo)
+            VALUES (?, ?, ?, ?)
+        """, ("Administrador", "admin@agrovita.com", senha_hash, "admin"))
+
     conexao.commit()
     conexao.close()
 
@@ -62,7 +89,6 @@ criar_tabelas()
 
 
 # controle de animais
-
 def criar_animal(dados):
     conexao = conectar_banco()
     cursor = conexao.cursor()
@@ -233,9 +259,54 @@ def remover_manejo(id):
 
     conexao.commit()
     conexao.close()
+    
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "usuario_id" not in session:
+            return redirect(url_for("login"))
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form["email"]
+        senha = request.form["senha"]
+
+        conexao = conectar_banco()
+
+        usuario = conexao.execute(
+            "SELECT * FROM usuarios WHERE email = ?",
+            (email,)
+        ).fetchone()
+
+        conexao.close()
+
+        if usuario and check_password_hash(usuario["senha"], senha):
+            session["usuario_id"] = usuario["id"]
+            session["usuario_nome"] = usuario["nome"]
+            session["usuario_tipo"] = usuario["tipo"]
+
+            return redirect(url_for("inicio"))
+
+        return render_template(
+            "login.html",
+            erro="E-mail ou senha inválidos."
+        )
+
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 # Rota de Registro de Manejo
 @app.route("/manejo", methods=["GET", "POST"])
+@login_required
 def manejo():
     if request.method == "POST":
         criar_manejo({
@@ -251,6 +322,7 @@ def manejo():
     return render_template("manejo.html")
 
 @app.route("/manejo/atualizar/<int:id>", methods=["GET", "POST"])
+@login_required
 def atualizar_manejo_route(id):
     registro = buscar_manejo(id)
 
@@ -274,12 +346,14 @@ def atualizar_manejo_route(id):
 
 
 @app.route("/manejo/remover/<int:id>", methods=["POST"])
+@login_required
 def remover_manejo_route(id):
     remover_manejo(id)
     return redirect(url_for("listagem"))
 
 # Atualize a rota de listagem existente para enviar também os manejos
 @app.route("/listagem")
+@login_required
 def listagem():
     vacinacoes = listar_vacinacoes()
 
@@ -418,6 +492,7 @@ def status_vacina(proxima_dose):
 
 # Página inicial
 @app.route("/")
+@login_required
 def inicio():
     total_animais = len(listar_animais())
     total_vacinacoes = len(listar_vacinacoes())
@@ -433,6 +508,7 @@ def inicio():
 
 # Cadastro de animal
 @app.route("/cadastro", methods=["GET", "POST"])
+@login_required
 def cadastro():
 
     if request.method == "POST":
@@ -450,6 +526,7 @@ def cadastro():
 
 # Edição de animal
 @app.route("/animais/atualizar/<int:id>", methods=["GET", "POST"])
+@login_required
 def atualizar_animal_route(id):
     animal = buscar_animal(id)
 
@@ -470,6 +547,7 @@ def atualizar_animal_route(id):
 
 # Remoção de um animal
 @app.route("/animais/remover/<int:id>", methods=["POST"])
+@login_required
 def remover_animal_route(id):
     remover_animal(id)
     return redirect(url_for("listagem"))
@@ -477,6 +555,7 @@ def remover_animal_route(id):
 
 # Registro de vacinação
 @app.route("/vacinacao", methods=["GET", "POST"])
+@login_required
 def vacinacao():
 
     if request.method == "POST":
@@ -499,6 +578,7 @@ def vacinacao():
 
 # Edição de um registro de vacinação
 @app.route("/vacinacao/atualizar/<int:id>", methods=["GET", "POST"])
+@login_required
 def atualizar_vacinacao_route(id):
 
     registro = buscar_vacinacao(id)
@@ -524,11 +604,13 @@ def atualizar_vacinacao_route(id):
     return render_template("vacinacao.html", registro=registro)
 
 @app.route("/vacinacao/remover/<int:id>", methods=["POST"])
+@login_required
 def remover_vacinacao_route(id):
     remover_vacinacao(id)
     return redirect(url_for("listagem"))
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
     animais = listar_animais()
     vacinacoes = listar_vacinacoes()
