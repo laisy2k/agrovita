@@ -19,54 +19,37 @@ def conectar_banco():
 def criar_tabelas():
     conexao = conectar_banco()
     cursor = conexao.cursor()
+    cursor.execute("PRAGMA table_info(animais)")
+    colunas_animais = [coluna[1] for coluna in cursor.fetchall()]
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS animais (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            identificacao TEXT NOT NULL,
-            especie TEXT NOT NULL,
-            raca TEXT,
-            data_nascimento TEXT
-        )
-    """)
+    if "usuario_id" not in colunas_animais:
+        cursor.execute("""
+            ALTER TABLE animais
+            ADD COLUMN usuario_id INTEGER
+            REFERENCES usuarios(id)
+        """)
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS vacinacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            animal TEXT NOT NULL,
-            vacina TEXT NOT NULL,
-            lote TEXT,
-            fabricante TEXT,
-            data_aplicacao TEXT,
-            proxima_dose TEXT,
-            dose TEXT,
-            responsavel TEXT,
-            observacoes TEXT
-        )
-    """)
+    # Adiciona usuario_id em manejos, caso ainda não exista
+    cursor.execute("PRAGMA table_info(manejos)")
+    colunas_manejos = [coluna[1] for coluna in cursor.fetchall()]
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS manejos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            animal TEXT NOT NULL,
-            tipo_manejo TEXT NOT NULL,
-            data_manejo TEXT NOT NULL,
-            produto TEXT,
-            dose TEXT,
-            responsavel TEXT NOT NULL,
-            observacoes TEXT
-        )
-    """)
+    if "usuario_id" not in colunas_manejos:
+        cursor.execute("""
+            ALTER TABLE manejos
+            ADD COLUMN usuario_id INTEGER
+            REFERENCES usuarios(id)
+        """)
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            senha TEXT NOT NULL,
-            tipo TEXT NOT NULL DEFAULT 'usuario'
-        )
-    """)
+    # Adiciona usuario_id em vacinacoes, caso ainda não exista
+    cursor.execute("PRAGMA table_info(vacinacoes)")
+    colunas_vacinacoes = [coluna[1] for coluna in cursor.fetchall()]
+
+    if "usuario_id" not in colunas_vacinacoes:
+        cursor.execute("""
+            ALTER TABLE vacinacoes
+            ADD COLUMN usuario_id INTEGER
+            REFERENCES usuarios(id)
+        """)
 
     cursor.execute(
         "SELECT * FROM usuarios WHERE email = ?",
@@ -76,11 +59,35 @@ def criar_tabelas():
 
     if admin is None:
         senha_hash = generate_password_hash("admin123")
-
         cursor.execute("""
             INSERT INTO usuarios (nome, email, senha, tipo)
             VALUES (?, ?, ?, ?)
         """, ("Administrador", "admin@agrovita.com", senha_hash, "admin"))
+
+    cursor.execute(
+        "SELECT id FROM usuarios WHERE email = ?",
+        ("admin@agrovita.com",)
+    )
+    admin_id = cursor.fetchone()["id"]
+    
+
+    cursor.execute("""
+        UPDATE animais
+        SET usuario_id = ?
+        WHERE usuario_id IS NULL
+    """, (admin_id,))
+
+    cursor.execute("""
+        UPDATE manejos
+        SET usuario_id = ?
+        WHERE usuario_id IS NULL
+    """, (admin_id,))
+
+    cursor.execute("""
+        UPDATE vacinacoes
+        SET usuario_id = ?
+        WHERE usuario_id IS NULL
+    """, (admin_id,))
 
     conexao.commit()
     conexao.close()
@@ -89,7 +96,7 @@ criar_tabelas()
 
 
 # controle de animais
-def criar_animal(dados):
+def criar_animal(dados, usuario_id):
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
@@ -98,44 +105,46 @@ def criar_animal(dados):
             identificacao,
             especie,
             raca,
-            data_nascimento
+            data_nascimento,
+            usuario_id
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
     """, (
         dados.get("identificacao"),
         dados.get("especie"),
         dados.get("raca"),
-        dados.get("data_nascimento")
+        dados.get("data_nascimento"),
+        usuario_id
     ))
 
     conexao.commit()
     conexao.close()
-
-
-def listar_animais():
+    
+def listar_animais(usuario_id):
     conexao = conectar_banco()
 
     animais = conexao.execute(
-        "SELECT * FROM animais"
+        "SELECT * FROM animais WHERE usuario_id = ?",
+        (usuario_id,)
     ).fetchall()
 
     conexao.close()
     return animais
 
 
-def buscar_animal(id):
+def buscar_animal(id, usuario_id):
     conexao = conectar_banco()
 
     animal = conexao.execute(
-        "SELECT * FROM animais WHERE id = ?",
-        (id,)
+        "SELECT * FROM animais WHERE id = ? AND usuario_id = ?",
+        (id, usuario_id)
     ).fetchone()
 
     conexao.close()
     return animal
 
 
-def atualizar_animal(id, dados):
+def atualizar_animal(id, dados, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute("""
@@ -144,33 +153,34 @@ def atualizar_animal(id, dados):
             especie = ?,
             raca = ?,
             data_nascimento = ?
-        WHERE id = ?
+        WHERE id = ? AND usuario_id = ?
     """, (
         dados.get("identificacao"),
         dados.get("especie"),
         dados.get("raca"),
         dados.get("data_nascimento"),
-        id
+        id,
+        usuario_id
     ))
 
     conexao.commit()
     conexao.close()
 
 
-def remover_animal(id):
+def remover_animal(id, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute(
-        "DELETE FROM animais WHERE id = ?",
-        (id,)
+        "DELETE FROM animais WHERE id = ? AND usuario_id = ?",
+        (id, usuario_id)
     )
 
     conexao.commit()
     conexao.close()
+    
 
 # controle de manejo
-
-def criar_manejo(dados):
+def criar_manejo(dados, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute("""
@@ -181,9 +191,10 @@ def criar_manejo(dados):
             produto,
             dose,
             responsavel,
-            observacoes
+            observacoes,
+            usuario_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         dados.get("animal"),
         dados.get("tipo_manejo"),
@@ -191,37 +202,39 @@ def criar_manejo(dados):
         dados.get("produto"),
         dados.get("dose"),
         dados.get("responsavel"),
-        dados.get("observacoes")
+        dados.get("observacoes"),
+        usuario_id
     ))
 
     conexao.commit()
     conexao.close()
 
 
-def listar_manejos():
+def listar_manejos(usuario_id):
     conexao = conectar_banco()
 
     manejos = conexao.execute(
-        "SELECT * FROM manejos ORDER BY id DESC"
+        "SELECT * FROM manejos WHERE usuario_id = ? ORDER BY id DESC",
+        (usuario_id,)
     ).fetchall()
 
     conexao.close()
     return manejos
 
 
-def buscar_manejo(id):
+def buscar_manejo(id, usuario_id):
     conexao = conectar_banco()
 
     manejo = conexao.execute(
-        "SELECT * FROM manejos WHERE id = ?",
-        (id,)
+        "SELECT * FROM manejos WHERE id = ? AND usuario_id = ?",
+        (id, usuario_id)
     ).fetchone()
 
     conexao.close()
     return manejo
 
 
-def atualizar_manejo(id, dados):
+def atualizar_manejo(id, dados, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute("""
@@ -233,7 +246,7 @@ def atualizar_manejo(id, dados):
             dose = ?,
             responsavel = ?,
             observacoes = ?
-        WHERE id = ?
+        WHERE id = ? AND usuario_id = ?
     """, (
         dados.get("animal"),
         dados.get("tipo_manejo"),
@@ -242,19 +255,20 @@ def atualizar_manejo(id, dados):
         dados.get("dose"),
         dados.get("responsavel"),
         dados.get("observacoes"),
-        id
+        id,
+        usuario_id
     ))
 
     conexao.commit()
     conexao.close()
 
 
-def remover_manejo(id):
+def remover_manejo(id, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute(
-        "DELETE FROM manejos WHERE id = ?",
-        (id,)
+        "DELETE FROM manejos WHERE id = ? AND usuario_id = ?",
+        (id, usuario_id)
     )
 
     conexao.commit()
@@ -317,14 +331,15 @@ def manejo():
             "dose": request.form.get("dose"),
             "responsavel": request.form.get("responsavel"),
             "observacoes": request.form.get("observacoes")
-        })
+        }, session["usuario_id"])
+
         return redirect(url_for("listagem"))
     return render_template("manejo.html")
 
 @app.route("/manejo/atualizar/<int:id>", methods=["GET", "POST"])
 @login_required
 def atualizar_manejo_route(id):
-    registro = buscar_manejo(id)
+    registro = buscar_manejo(id, session["usuario_id"])
 
     if registro is None:
         return redirect(url_for("listagem"))
@@ -338,7 +353,7 @@ def atualizar_manejo_route(id):
             "dose": request.form.get("dose"),
             "responsavel": request.form.get("responsavel"),
             "observacoes": request.form.get("observacoes")
-        })
+        }, session["usuario_id"])
 
         return redirect(url_for("listagem"))
 
@@ -348,23 +363,23 @@ def atualizar_manejo_route(id):
 @app.route("/manejo/remover/<int:id>", methods=["POST"])
 @login_required
 def remover_manejo_route(id):
-    remover_manejo(id)
+    remover_manejo(id, session["usuario_id"])
     return redirect(url_for("listagem"))
 
 # Atualize a rota de listagem existente para enviar também os manejos
 @app.route("/listagem")
 @login_required
 def listagem():
-    vacinacoes = listar_vacinacoes()
+    vacinacoes = listar_vacinacoes(session["usuario_id"])
 
     return render_template(
         "listagem.html",
-        animais=listar_animais(),
+        animais = listar_animais(session["usuario_id"]),
         vacinacoes=vacinacoes,
-        manejos=listar_manejos()
+        manejos=listar_manejos(session["usuario_id"])
     )
     
-def criar_vacinacao(dados):
+def criar_vacinacao(dados, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute("""
@@ -377,9 +392,10 @@ def criar_vacinacao(dados):
             proxima_dose,
             dose,
             responsavel,
-            observacoes
+            observacoes,
+            usuario_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         dados.get("animal"),
         dados.get("vacina"),
@@ -389,18 +405,20 @@ def criar_vacinacao(dados):
         dados.get("proxima_dose"),
         dados.get("dose"),
         dados.get("responsavel"),
-        dados.get("observacoes")
+        dados.get("observacoes"),
+        usuario_id
     ))
 
     conexao.commit()
     conexao.close()
 
 
-def listar_vacinacoes():
+def listar_vacinacoes(usuario_id):
     conexao = conectar_banco()
 
     registros = conexao.execute(
-        "SELECT * FROM vacinacoes"
+        "SELECT * FROM vacinacoes WHERE usuario_id = ?",
+        (usuario_id,)
     ).fetchall()
 
     conexao.close()
@@ -417,19 +435,19 @@ def listar_vacinacoes():
     return vacinacoes
 
 
-def buscar_vacinacao(id):
+def buscar_vacinacao(id, usuario_id):
     conexao = conectar_banco()
 
     vacinacao = conexao.execute(
-        "SELECT * FROM vacinacoes WHERE id = ?",
-        (id,)
+        "SELECT * FROM vacinacoes WHERE id = ? AND usuario_id = ?",
+        (id, usuario_id)
     ).fetchone()
 
     conexao.close()
     return vacinacao
 
 
-def atualizar_vacinacao(id, dados):
+def atualizar_vacinacao(id, dados, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute("""
@@ -443,7 +461,7 @@ def atualizar_vacinacao(id, dados):
             dose = ?,
             responsavel = ?,
             observacoes = ?
-        WHERE id = ?
+        WHERE id = ? AND usuario_id = ?
     """, (
         dados.get("animal"),
         dados.get("vacina"),
@@ -454,19 +472,20 @@ def atualizar_vacinacao(id, dados):
         dados.get("dose"),
         dados.get("responsavel"),
         dados.get("observacoes"),
-        id
+        id,
+        usuario_id
     ))
 
     conexao.commit()
     conexao.close()
 
 
-def remover_vacinacao(id):
+def remover_vacinacao(id, usuario_id):
     conexao = conectar_banco()
 
     conexao.execute(
-        "DELETE FROM vacinacoes WHERE id = ?",
-        (id,)
+        "DELETE FROM vacinacoes WHERE id = ? AND usuario_id = ?",
+        (id, usuario_id)
     )
 
     conexao.commit()
@@ -489,14 +508,14 @@ def status_vacina(proxima_dose):
         return "hoje"
     else:
         return "em_dia"
-
+    
 # Página inicial
 @app.route("/")
 @login_required
 def inicio():
-    total_animais = len(listar_animais())
-    total_vacinacoes = len(listar_vacinacoes())
-    total_manejos = len(listar_manejos())
+    total_animais = len(listar_animais(session["usuario_id"]))
+    total_vacinacoes = len(listar_vacinacoes(session["usuario_id"]))
+    total_manejos = len(listar_manejos(session["usuario_id"]))
 
     return render_template(
         "index.html",
@@ -513,12 +532,12 @@ def cadastro():
 
     if request.method == "POST":
 
-        criar_animal({
-            "identificacao": request.form.get("identificacao"),
-            "especie": request.form.get("especie"),
-            "raca": request.form.get("raca"),
-            "data_nascimento": request.form.get("data_nascimento"),
-        })
+        criar_animal({ 
+    "identificacao": request.form.get("identificacao"), 
+    "especie": request.form.get("especie"), 
+    "raca": request.form.get("raca"), 
+    "data_nascimento": request.form.get("data_nascimento"), 
+}, session["usuario_id"])
 
         return redirect(url_for("listagem"))
 
@@ -528,7 +547,7 @@ def cadastro():
 @app.route("/animais/atualizar/<int:id>", methods=["GET", "POST"])
 @login_required
 def atualizar_animal_route(id):
-    animal = buscar_animal(id)
+    animal = buscar_animal(id, session["usuario_id"])
 
     if animal is None:
         return redirect(url_for("listagem"))
@@ -539,17 +558,21 @@ def atualizar_animal_route(id):
             "especie": request.form.get("especie"),
             "raca": request.form.get("raca"),
             "data_nascimento": request.form.get("data_nascimento"),
-        })
+        }, session["usuario_id"])
+        
+        
 
         return redirect(url_for("listagem"))
 
     return render_template("cadastro.html", animal=animal)
 
+
+
 # Remoção de um animal
 @app.route("/animais/remover/<int:id>", methods=["POST"])
 @login_required
 def remover_animal_route(id):
-    remover_animal(id)
+    remover_animal(id, session["usuario_id"])
     return redirect(url_for("listagem"))
 
 
@@ -569,7 +592,7 @@ def vacinacao():
             "dose": request.form.get("dose"),
             "responsavel": request.form.get("responsavel"),
             "observacoes": request.form.get("observacoes"),
-        })
+        }, session["usuario_id"])
 
         return redirect(url_for("listagem"))
 
@@ -581,7 +604,7 @@ def vacinacao():
 @login_required
 def atualizar_vacinacao_route(id):
 
-    registro = buscar_vacinacao(id)
+    registro = buscar_vacinacao(id, session["usuario_id"])
 
     if registro is None:
         return redirect(url_for("listagem"))
@@ -597,7 +620,7 @@ def atualizar_vacinacao_route(id):
             "dose": request.form.get("dose"),
             "responsavel": request.form.get("responsavel"),
             "observacoes": request.form.get("observacoes"),
-        })
+        }, session["usuario_id"])
 
         return redirect(url_for("listagem"))
 
@@ -606,15 +629,15 @@ def atualizar_vacinacao_route(id):
 @app.route("/vacinacao/remover/<int:id>", methods=["POST"])
 @login_required
 def remover_vacinacao_route(id):
-    remover_vacinacao(id)
+    remover_vacinacao(id, session["usuario_id"])
     return redirect(url_for("listagem"))
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    animais = listar_animais()
-    vacinacoes = listar_vacinacoes()
-    manejos = listar_manejos()
+    animais = listar_animais(session["usuario_id"])
+    vacinacoes = listar_vacinacoes(session["usuario_id"])   
+    manejos = listar_manejos(session["usuario_id"])
 
     # Métricas gerais
     total_animais = len(animais)
@@ -642,7 +665,7 @@ def dashboard():
         if vacinacao.get("status") == "atrasada"
     ]
 
-   # Últimos 5 manejos cadastrados
+# Últimos 5 manejos cadastrados
     manejos_recentes = manejos[:5]
 
     return render_template(
