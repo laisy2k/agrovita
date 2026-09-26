@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from datetime import date
 from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 import sqlite3 
 import os
 from functools import wraps
@@ -131,6 +132,75 @@ def listar_animais(usuario_id):
     conexao.close()
     return animais
 
+def listar_usuarios():
+    conexao = conectar_banco()
+
+    usuarios = conexao.execute("""
+        SELECT id, nome, email, tipo
+        FROM usuarios
+        ORDER BY nome
+    """).fetchall()
+
+    conexao.close()
+    return usuarios
+
+def criar_usuario(nome, email, senha, tipo):
+    conexao = conectar_banco()
+
+    senha_hash = generate_password_hash(senha)
+
+    conexao.execute("""
+        INSERT INTO usuarios (nome, email, senha, tipo)
+        VALUES (?, ?, ?, ?)
+    """, (
+        nome,
+        email,
+        senha_hash,
+        tipo
+    ))
+
+    conexao.commit()
+    conexao.close()
+def buscar_usuario(id):
+    conexao = conectar_banco()
+
+    usuario = conexao.execute(
+        "SELECT id, nome, email, tipo FROM usuarios WHERE id = ?",
+        (id,)
+    ).fetchone()
+
+    conexao.close()
+    return usuario
+
+def atualizar_usuario(id, nome, email, tipo):
+    conexao = conectar_banco()
+
+    conexao.execute("""
+        UPDATE usuarios
+        SET nome = ?,
+            email = ?,
+            tipo = ?
+        WHERE id = ?
+    """, (
+        nome,
+        email,
+        tipo,
+        id
+    ))
+
+    conexao.commit()
+    conexao.close()
+    
+def remover_usuario(id):
+    conexao = conectar_banco()
+
+    conexao.execute(
+        "DELETE FROM usuarios WHERE id = ?",
+        (id,)
+    )
+
+    conexao.commit()
+    conexao.close()
 
 def buscar_animal(id, usuario_id):
     conexao = conectar_banco()
@@ -283,6 +353,85 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "usuario_id" not in session:
+            return redirect(url_for("login"))
+
+        if session.get("usuario_tipo") != "admin":
+            flash("Acesso permitido apenas para administradores.")
+            return redirect(url_for("inicio"))
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+@app.route("/cadastro-usuario", methods=["GET", "POST"])
+def cadastro_usuario():
+    if request.method == "POST":
+        nome = request.form["nome"]
+        email = request.form["email"]
+        senha = request.form["senha"]
+
+        conexao = conectar_banco()
+
+        usuario_existente = conexao.execute(
+            "SELECT id FROM usuarios WHERE email = ?",
+            (email,)
+        ).fetchone()
+
+        conexao.close()
+
+        if usuario_existente:
+            return render_template(
+                "cadastro_usuario.html",
+                erro="Já existe uma conta com esse e-mail."
+            )
+
+        criar_usuario(nome, email, senha, "usuario")
+
+        return redirect(url_for("login"))
+
+    return render_template("cadastro_usuario.html")
+
+@app.route("/usuarios/editar/<int:id>", methods=["GET", "POST"])
+@admin_required
+def editar_usuario(id):
+    usuario = buscar_usuario(id)
+
+    if usuario is None:
+        return redirect(url_for("usuarios"))
+
+    if request.method == "POST":
+        nome = request.form["nome"]
+        email = request.form["email"]
+        tipo = request.form["tipo"]
+
+        if id == session["usuario_id"] and tipo != "admin":
+            flash("Você não pode remover seu próprio acesso de administrador.")
+            return redirect(url_for("editar_usuario", id=id))
+
+        atualizar_usuario(id, nome, email, tipo)
+
+        return redirect(url_for("usuarios"))
+
+    return render_template(
+        "editar_usuario.html",
+        usuario=usuario
+    )
+
+@app.route("/usuarios/excluir/<int:id>", methods=["POST"])
+@admin_required
+def excluir_usuario(id):
+    if id == session["usuario_id"]:
+        flash("Você não pode excluir sua própria conta.")
+        return redirect(url_for("usuarios"))
+
+    remover_usuario(id)
+
+    return redirect(url_for("usuarios"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -542,6 +691,27 @@ def cadastro():
         return redirect(url_for("listagem"))
 
     return render_template("cadastro.html")
+
+#usuarios
+@app.route("/usuarios", methods=["GET", "POST"])
+@admin_required
+def usuarios():
+    if request.method == "POST":
+        nome = request.form["nome"]
+        email = request.form["email"]
+        senha = request.form["senha"]
+        tipo = request.form["tipo"]
+
+        criar_usuario(nome, email, senha, tipo)
+
+        return redirect(url_for("usuarios"))
+
+    usuarios = listar_usuarios()
+
+    return render_template(
+        "usuarios.html",
+        usuarios=usuarios
+    )
 
 # Edição de animal
 @app.route("/animais/atualizar/<int:id>", methods=["GET", "POST"])

@@ -45,6 +45,10 @@
                     Dashboard
                 </a>
 
+                {% if session.get("usuario_tipo") == "admin" %}
+                <a href="{{ url_for('usuarios') }}">Usuários</a>
+                {% endif %}
+
                 <a href="{{ url_for('cadastro') }}">
                     Animais
                 </a>
