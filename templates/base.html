@@ -22,58 +22,36 @@
 
     <header class="header">
 
-        <div class="container header-content">
+    <div class="container header-content">
 
-            <div class="logo">
-
-                <span class="logo-icon"></span>
-
-                <div>
-                    <h1>AgroVita</h1>
-                    <span>Controle Sanitário</span>
-                </div>
-
-            </div>
-
-
-            <nav class="nav">
-                <a href="{{ url_for('inicio') }}">
-                    Início
-                </a>
-
-                <a href="{{ url_for('dashboard') }}">
-                    Dashboard
-                </a>
-
-                {% if session.get("usuario_tipo") == "admin" %}
-                <a href="{{ url_for('usuarios') }}">Usuários</a>
-                {% endif %}
-
-                <a href="{{ url_for('cadastro') }}">
-                    Animais
-                </a>
-
-                <a href="{{ url_for('vacinacao') }}">
-                    Vacinação
-                </a>
-
-                <a href="{{ url_for('manejo') }}">
-                    Manejo
-                </a>
-
-                <a href="{{ url_for('listagem') }}">
-                    Registros
-                </a>
-                {% if session.get("usuario_id") %}
-    <a href="{{ url_for('logout') }}">Sair</a>
-{% endif %}
-            </nav>
-            </nav>
-
+        <div class="logo">
+            <img
+                src="{{ url_for('static', filename='img/logo-agrovita.png') }}"
+                alt="AgroVita - Controle Sanitário"
+                class="logo-img"
+            >
         </div>
 
-    </header>
+{% if session.get("usuario_id") %}
+    <nav class="nav">
+        <a href="{{ url_for('inicio') }}">Início</a>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
 
+        {% if session.get("usuario_tipo") == "admin" %}
+            <a href="{{ url_for('usuarios') }}">Usuários</a>
+        {% endif %}
+
+        <a href="{{ url_for('cadastro') }}">Animais</a>
+        <a href="{{ url_for('vacinacao') }}">Vacinação</a>
+        <a href="{{ url_for('manejo') }}">Manejo</a>
+        <a href="{{ url_for('listagem') }}">Registros</a>
+        <a href="{{ url_for('logout') }}">Sair</a>
+    </nav>
+{% endif %}
+
+    </div>
+
+</header>
 
     <main class="container main-content">
 

@@ -1,171 +1,245 @@
 {% extends "base.html" %}
 
-{% block title %}Listagem{% endblock %}
+{% block title %}Registros{% endblock %}
 
 {% block content %}
 
-<h2>Animais registrados</h2>
+<div class="page-header">
+    <span class="page-tag">HISTÓRICO</span>
+    <h2>Registros da propriedade</h2>
+    <p>
+        Consulte e gerencie os animais, vacinações e manejos sanitários registrados.
+    </p>
+</div>
 
-<table>
 
-    <thead>
-        <tr>
-            <th>Identificação</th>
-            <th>Espécie</th>
-            <th>Raça</th>
-            <th>Data de nascimento</th>
-            <th>Ações</th>
-        </tr>
-    </thead>
+<!-- ===================== ANIMAIS ===================== -->
 
-    <tbody>
+<div class="card registros-card">
 
-        {% if animais %}
-        {% for a in animais %}
-        <tr>
-            <td>{{ a.identificacao }}</td>
-            <td>{{ a.especie }}</td>
-            <td>{{ a.raca }}</td>
-            <td>{{ a.data_nascimento }}</td>
-            <td>
-                <a href="{{ url_for('atualizar_animal_route', id=a.id) }}">
-                    Editar
-                </a>
+    <div class="registros-header">
+        <div>
+            <h3>Animais registrados</h3>
+            <p>Animais cadastrados na propriedade.</p>
+        </div>
 
-                <form action="{{ url_for('remover_animal_route', id=a.id) }}" method="POST"
-                    onsubmit="return confirm('Remover este animal?');" class="inline-form">
-                    <button type="submit" class="link-danger">
-                        Remover
-                    </button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-        {% else %}
-        <tr>
-            <td colspan="5">Nenhum animal registrado</td>
-        </tr>
-        {% endif %}
+        <a href="{{ url_for('cadastro') }}" class="button button-secondary">
+            Cadastrar animal
+        </a>
+    </div>
 
-    </tbody>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Identificação</th>
+                    <th>Espécie</th>
+                    <th>Raça</th>
+                    <th>Data de nascimento</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
 
-</table>
+            <tbody>
+                {% if animais %}
+                    {% for a in animais %}
+                    <tr>
+                        <td>{{ a.identificacao }}</td>
+                        <td>{{ a.especie }}</td>
+                        <td>{{ a.raca }}</td>
+                        <td>{{ a.data_nascimento }}</td>
 
-<!-- ===================== INÍCIO: CONTROLE DE VACINAÇÃO (Guilherme) ===================== -->
+                        <td class="table-actions">
+                            <a href="{{ url_for('atualizar_animal_route', id=a.id) }}"
+                               class="link-edit">
+                                Editar
+                            </a>
 
-<h2>Vacinações registradas</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Animal</th>
-            <th>Vacina</th>
-            <th>Data da aplicação</th>
-            <th>Próxima dose</th>
-            <th>Status</th>
-            <th>Responsável</th>
-            <th>Ações</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% if vacinacoes %}
-        {% for v in vacinacoes %}
-        <tr>
-            <td>{{ v.animal }}</td>
-            <td>{{ v.vacina }}</td>
-            <td>{{ v.data_aplicacao }}</td>
-            <td>{{ v.proxima_dose }}</td>
-            <td>
-                {% if v.status == "atrasada" %}
-                <span class="badge badge-danger">Atrasada</span>
-                {% elif v.status == "hoje" %}
-                <span class="badge badge-warning">Vence hoje</span>
-                {% elif v.status == "em_dia" %}
-                <span class="badge badge-success">Em dia</span>
+                            <form
+                                action="{{ url_for('remover_animal_route', id=a.id) }}"
+                                method="POST"
+                                onsubmit="return confirm('Remover este animal?');"
+                                class="inline-form"
+                            >
+                                <button type="submit" class="link-danger">
+                                    Remover
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
                 {% else %}
-                -
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            Nenhum animal registrado
+                        </td>
+                    </tr>
                 {% endif %}
-            </td>
-            <td>{{ v.responsavel }}</td>
-            <td>
-                <a href="{{ url_for('atualizar_vacinacao_route', id=v.id) }}">
-                    Editar
-                </a>
+            </tbody>
+        </table>
+    </div>
 
-                <form action="{{ url_for('remover_vacinacao_route', id=v.id) }}" method="POST"
-                    onsubmit="return confirm('Remover esta vacinação?');" class="inline-form">
-                    <button type="submit" class="link-danger">
-                        Remover
-                    </button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-        {% else %}
-        <tr>
-            <td colspan="7">Nenhuma vacinação registrada</td>
-        </tr>
-        {% endif %}
-    </tbody>
-</table>
-
-<!-- ===================== FIM: CONTROLE DE VACINAÇÃO ===================== -->
+</div>
 
 
+<!-- ===================== VACINAÇÕES ===================== -->
+
+<div class="card registros-card">
+
+    <div class="registros-header">
+        <div>
+            <h3>Vacinações registradas</h3>
+            <p>Histórico de aplicações e próximas doses.</p>
+        </div>
+
+        <a href="{{ url_for('vacinacao') }}" class="button button-secondary">
+            Registrar vacinação
+        </a>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Animal</th>
+                    <th>Vacina</th>
+                    <th>Data da aplicação</th>
+                    <th>Próxima dose</th>
+                    <th>Status</th>
+                    <th>Responsável</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% if vacinacoes %}
+                    {% for v in vacinacoes %}
+                    <tr>
+                        <td>{{ v.animal }}</td>
+                        <td>{{ v.vacina }}</td>
+                        <td>{{ v.data_aplicacao }}</td>
+                        <td>{{ v.proxima_dose }}</td>
+
+                        <td>
+                            {% if v.status == "atrasada" %}
+                                <span class="badge badge-danger">Atrasada</span>
+
+                            {% elif v.status == "hoje" %}
+                                <span class="badge badge-warning">Vence hoje</span>
+
+                            {% elif v.status == "em_dia" %}
+                                <span class="badge badge-success">Em dia</span>
+
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>{{ v.responsavel }}</td>
+
+                        <td class="table-actions">
+                            <a href="{{ url_for('atualizar_vacinacao_route', id=v.id) }}"
+                               class="link-edit">
+                                Editar
+                            </a>
+
+                            <form
+                                action="{{ url_for('remover_vacinacao_route', id=v.id) }}"
+                                method="POST"
+                                onsubmit="return confirm('Remover esta vacinação?');"
+                                class="inline-form"
+                            >
+                                <button type="submit" class="link-danger">
+                                    Remover
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            Nenhuma vacinação registrada
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
 
 
+<!-- ===================== MANEJOS ===================== -->
 
+<div class="card registros-card">
 
-<h2>Manejos Sanitários registrados</h2>
-<table>
-    <thead>
-        <tr>
-            <th>Animal</th>
-            <th>Tipo de Manejo</th>
-            <th>Data</th>
-            <th>Produto</th>
-            <th>Dose</th>
-            <th>Responsável</th>
-            <th>Ações</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% if manejos %}
-        {% for m in manejos %}
-        <tr>
-            <td>{{ m.animal }}</td>
-            <td>{{ m.tipo_manejo }}</td>
-            <td>{{ m.data_manejo }}</td>
-            <td>{{ m.produto }}</td>
-            <td>{{ m.dose }}</td>
-            <td>{{ m.responsavel }}</td>
-            <td>
-    <a href="{{ url_for('atualizar_manejo_route', id=m.id) }}">
-        Editar
-    </a>
+    <div class="registros-header">
+        <div>
+            <h3>Manejos sanitários registrados</h3>
+            <p>Histórico dos procedimentos realizados nos animais.</p>
+        </div>
 
-    <form
-        action="{{ url_for('remover_manejo_route', id=m.id) }}"
-        method="POST"
-        onsubmit="return confirm('Remover este manejo?');"
-        class="inline-form"
-    >
-        <button type="submit" class="link-danger">
-            Remover
-        </button>
-    </form>
-</td>
-        </tr>
-        {% endfor %}
-        {% else %}
-        <tr>
-            <td colspan="7">Nenhum manejo registrado</td>
-        </tr>
-        {% endif %}
-    </tbody>
-</table>
+        <a href="{{ url_for('manejo') }}" class="button button-secondary">
+            Registrar manejo
+        </a>
+    </div>
 
-<!-- ===================== FIM: CONTROLE DE REGISTROS ===================== -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Animal</th>
+                    <th>Tipo de manejo</th>
+                    <th>Data</th>
+                    <th>Produto</th>
+                    <th>Dose</th>
+                    <th>Responsável</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
 
+            <tbody>
+                {% if manejos %}
+                    {% for m in manejos %}
+                    <tr>
+                        <td>{{ m.animal }}</td>
+                        <td>{{ m.tipo_manejo }}</td>
+                        <td>{{ m.data_manejo }}</td>
+                        <td>{{ m.produto }}</td>
+                        <td>{{ m.dose }}</td>
+                        <td>{{ m.responsavel }}</td>
+
+                        <td class="table-actions">
+                            <a href="{{ url_for('atualizar_manejo_route', id=m.id) }}"
+                            class="link-edit">
+                                Editar
+                            </a>
+
+                            <form
+                                action="{{ url_for('remover_manejo_route', id=m.id) }}"
+                                method="POST"
+                                onsubmit="return confirm('Remover este manejo?');"
+                                class="inline-form"
+                            >
+                                <button type="submit" class="link-danger">
+                                    Remover
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            Nenhum manejo registrado
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
 
 {% endblock %}
