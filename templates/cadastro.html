@@ -1,54 +1,98 @@
 {% extends "base.html" %}
 
 {% block title %}
-    {% if animal %}Editar Animal{% else %}Cadastro{% endif %}
+    {% if animal %}Editar Animal{% else %}Animais{% endif %}
 {% endblock %}
 
 {% block content %}
 
-<h2>
-    {% if animal %}
-        Editar Animal
-    {% else %}
-        Registro de Animal
-    {% endif %}
-</h2>
+<div class="page-header">
+    <span class="page-tag">GESTÃO DE ANIMAIS</span>
 
-<form method="POST">
+    <h2>
+        {% if animal %}
+            Editar animal
+        {% else %}
+            Registro de animais
+        {% endif %}
+    </h2>
 
-    <label for="identificacao">Identificação do animal:</label>
-    <input
-        type="text"
-        id="identificacao"
-        name="identificacao"
-        value="{{ animal.identificacao if animal else '' }}"
-        required
-    >
+    <p>
+        Cadastre e mantenha organizadas as informações dos animais da propriedade.
+    </p>
+</div>
 
-    <label for="especie">Espécie:</label>
-    <input
-        type="text"
-        id="especie"
-        name="especie"
-        value="{{ animal.especie if animal else '' }}"
-        required
-    >
+<div class="card">
 
-    <label for="raca">Raça:</label>
-    <input
-        type="text"
-        id="raca"
-        name="raca"
-        value="{{ animal.raca if animal else '' }}"
-    >
+    <form method="POST">
 
-    <label for="data_nascimento">Data de nascimento:</label>
-    <input
-        type="date"
-        id="data_nascimento"
-        name="data_nascimento"
-        value="{{ animal.data_nascimento if animal else '' }}"
-    >
+        <div class="form-section">
+            <h3>Identificação</h3>
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="identificacao">Identificação do animal</label>
+                    <input
+                        type="text"
+                        id="identificacao"
+                        name="identificacao"
+                        placeholder="Ex.: BR-001"
+                        value="{{ animal.identificacao if animal else '' }}"
+                        required
+                    >
+                    <small>Informe o número, código ou identificação utilizada para o animal.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="especie">Espécie</label>
+                    <input
+                        type="text"
+                        id="especie"
+                        name="especie"
+                        placeholder="Ex.: Bovino"
+                        value="{{ animal.especie if animal else '' }}"
+                        required
+                    >
+                </div>
+
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Informações do animal</h3>
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="raca">Raça</label>
+                    <input
+                        type="text"
+                        id="raca"
+                        name="raca"
+                        placeholder="Ex.: Nelore"
+                        value="{{ animal.raca if animal else '' }}"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="data_nascimento">Data de nascimento</label>
+                    <input
+                        type="date"
+                        id="data_nascimento"
+                        name="data_nascimento"
+                        value="{{ animal.data_nascimento if animal else '' }}"
+                    >
+                </div>
+
+            </div>
+        </div>
+
+<div class="form-actions">
+
+    <a href="{{ url_for('listagem') }}" class="button button-secondary">
+        Cancelar
+    </a>
 
     <button type="submit">
         {% if animal %}
@@ -58,6 +102,10 @@
         {% endif %}
     </button>
 
-</form>
+</div>
+
+    </form>
+
+</div>
 
 {% endblock %}

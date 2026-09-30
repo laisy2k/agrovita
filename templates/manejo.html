@@ -6,74 +6,147 @@
 
 {% block content %}
 
-<h2>
-    {% if registro %}
-        Editar Manejo Sanitário
-    {% else %}
-        Registro de Manejo Sanitário
-    {% endif %}
-</h2>
+<div class="page-header">
+    <span class="page-tag">CONTROLE SANITÁRIO</span>
 
-<form method="POST">
+    <h2>
+        {% if registro %}
+            Editar manejo sanitário
+        {% else %}
+            Registro de manejo sanitário
+        {% endif %}
+    </h2>
 
-    <label>Animal / Identificação:</label>
-    <input
-        type="text"
-        name="animal"
-        value="{{ registro.animal if registro else '' }}"
-        required
-    >
+    <p>
+        Registre os procedimentos de manejo realizados nos animais da propriedade.
+    </p>
+</div>
 
-    <label>Tipo de Manejo:</label>
-    <input
-        type="text"
-        name="tipo_manejo"
-        placeholder="Ex: Vermifugação, Pesagem"
-        value="{{ registro.tipo_manejo if registro else '' }}"
-        required
-    >
+<div class="card">
 
-    <label>Data do Manejo:</label>
-    <input
-        type="date"
-        name="data_manejo"
-        value="{{ registro.data_manejo if registro else '' }}"
-        required
-    >
+    <form method="POST">
 
-    <label>Produto Aplicado:</label>
-    <input
-        type="text"
-        name="produto"
-        value="{{ registro.produto if registro else '' }}"
-    >
+        <div class="form-section">
+            <h3>Identificação</h3>
 
-    <label>Dose:</label>
-    <input
-        type="text"
-        name="dose"
-        value="{{ registro.dose if registro else '' }}"
-    >
+            <div class="form-grid">
 
-    <label>Responsável:</label>
-    <input
-        type="text"
-        name="responsavel"
-        value="{{ registro.responsavel if registro else '' }}"
-        required
-    >
+                <div class="form-group">
+                    <label for="animal">Animal / Identificação</label>
+                    <input
+                        type="text"
+                        id="animal"
+                        name="animal"
+                        placeholder="Ex.: BR-001"
+                        value="{{ registro.animal if registro else '' }}"
+                        required
+                    >
+                    <small>Informe o número ou identificação do animal.</small>
+                </div>
 
-    <label>Observações:</label>
-    <textarea name="observacoes">{{ registro.observacoes if registro else '' }}</textarea>
+                <div class="form-group">
+                    <label for="tipo_manejo">Tipo de manejo</label>
+                    <input
+                        type="text"
+                        id="tipo_manejo"
+                        name="tipo_manejo"
+                        placeholder="Ex.: Vermifugação, pesagem"
+                        value="{{ registro.tipo_manejo if registro else '' }}"
+                        required
+                    >
+                </div>
+
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Informações do manejo</h3>
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label for="data_manejo">Data do manejo</label>
+                    <input
+                        type="date"
+                        id="data_manejo"
+                        name="data_manejo"
+                        value="{{ registro.data_manejo if registro else '' }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="produto">Produto utilizado (opcional) </label>
+                    <input
+                        type="text"
+                        id="produto"
+                        name="produto"
+                        placeholder="Nome do produto"
+                        value="{{ registro.produto if registro else '' }}"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="dose">Dose/quantidade (opcional)</label>
+                    <input
+                        type="text"
+                        id="dose"
+                        name="dose"
+                        placeholder="Ex.: 10 ml"
+                        value="{{ registro.dose if registro else '' }}"
+                    >
+                </div>
+
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Responsável</h3>
+
+            <div class="form-group">
+                <label for="responsavel">Responsável pelo manejo</label>
+                <input
+                    type="text"
+                    id="responsavel"
+                    name="responsavel"
+                    placeholder="Nome do responsável"
+                    value="{{ registro.responsavel if registro else '' }}"
+                    required
+                >
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Observações</h3>
+
+            <div class="form-group">
+                <label for="observacoes">Informações adicionais</label>
+                <textarea
+                    id="observacoes"
+                    name="observacoes"
+                    placeholder="Informe alguma observação sobre o manejo..."
+                >{{ registro.observacoes if registro else '' }}</textarea>
+            </div>
+        </div>
+
+<div class="form-actions">
+
+    <a href="{{ url_for('listagem') }}" class="button button-secondary">
+        Cancelar
+    </a>
 
     <button type="submit">
         {% if registro %}
-            Salvar Alterações
+            Salvar alterações
         {% else %}
-            Registrar Manejo
+            Registrar manejo
         {% endif %}
     </button>
 
-</form>
+</div>
+
+    </form>
+
+</div>
 
 {% endblock %}
