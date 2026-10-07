@@ -44,29 +44,42 @@
                 {% if animais %}
                     {% for a in animais %}
                     <tr>
-                        <td>{{ a.identificacao }}</td>
-                        <td>{{ a.especie }}</td>
-                        <td>{{ a.raca }}</td>
-                        <td>{{ a.data_nascimento }}</td>
+    <td data-label="Identificação">
+        {{ a.identificacao }}
+    </td>
 
-                        <td class="table-actions">
-                            <a href="{{ url_for('atualizar_animal_route', id=a.id) }}"
-                               class="link-edit">
-                                Editar
-                            </a>
+    <td data-label="Espécie">
+        {{ a.especie }}
+    </td>
 
-                            <form
-                                action="{{ url_for('remover_animal_route', id=a.id) }}"
-                                method="POST"
-                                onsubmit="return confirm('Remover este animal?');"
-                                class="inline-form"
-                            >
-                                <button type="submit" class="link-danger">
-                                    Remover
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
+    <td data-label="Raça">
+        {{ a.raca }}
+    </td>
+
+    <td data-label="Nascimento">
+        {{ a.data_nascimento }}
+    </td>
+
+    <td data-label="Ações" class="table-actions">
+        <a
+            href="{{ url_for('atualizar_animal_route', id=a.id) }}"
+            class="link-edit"
+        >
+            Editar
+        </a>
+
+        <form
+            action="{{ url_for('remover_animal_route', id=a.id) }}"
+            method="POST"
+            onsubmit="return confirm('Remover este animal?');"
+            class="inline-form"
+        >
+            <button type="submit" class="link-danger">
+                Remover
+            </button>
+        </form>
+    </td>
+</tr>
                     {% endfor %}
                 {% else %}
                     <tr>
@@ -115,46 +128,61 @@
                 {% if vacinacoes %}
                     {% for v in vacinacoes %}
                     <tr>
-                        <td>{{ v.animal }}</td>
-                        <td>{{ v.vacina }}</td>
-                        <td>{{ v.data_aplicacao }}</td>
-                        <td>{{ v.proxima_dose }}</td>
+    <td data-label="Animal">
+        {{ v.animal }}
+    </td>
 
-                        <td>
-                            {% if v.status == "atrasada" %}
-                                <span class="badge badge-danger">Atrasada</span>
+    <td data-label="Vacina">
+        {{ v.vacina | replace('_', ' ') | title }}
+    </td>
 
-                            {% elif v.status == "hoje" %}
-                                <span class="badge badge-warning">Vence hoje</span>
+    <td data-label="Aplicação">
+        {{ v.data_aplicacao }}
+    </td>
 
-                            {% elif v.status == "em_dia" %}
-                                <span class="badge badge-success">Em dia</span>
+    <td data-label="Próxima dose">
+        {{ v.proxima_dose }}
+    </td>
 
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
+    <td data-label="Status">
+        {% if v.status == "atrasada" %}
+            <span class="badge badge-danger">Atrasada</span>
 
-                        <td>{{ v.responsavel }}</td>
+        {% elif v.status == "hoje" %}
+            <span class="badge badge-warning">Vence hoje</span>
 
-                        <td class="table-actions">
-                            <a href="{{ url_for('atualizar_vacinacao_route', id=v.id) }}"
-                               class="link-edit">
-                                Editar
-                            </a>
+        {% elif v.status == "em_dia" %}
+            <span class="badge badge-success">Em dia</span>
 
-                            <form
-                                action="{{ url_for('remover_vacinacao_route', id=v.id) }}"
-                                method="POST"
-                                onsubmit="return confirm('Remover esta vacinação?');"
-                                class="inline-form"
-                            >
-                                <button type="submit" class="link-danger">
-                                    Remover
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
+        {% else %}
+            —
+        {% endif %}
+    </td>
+
+    <td data-label="Responsável">
+        {{ v.responsavel }}
+    </td>
+
+    <td data-label="Ações" class="table-actions">
+        <a
+            href="{{ url_for('atualizar_vacinacao_route', id=v.id) }}"
+            class="link-edit"
+        >
+            Editar
+        </a>
+
+        <form
+            action="{{ url_for('remover_vacinacao_route', id=v.id) }}"
+            method="POST"
+            onsubmit="return confirm('Remover esta vacinação?');"
+            class="inline-form"
+        >
+            <button type="submit" class="link-danger">
+                Remover
+            </button>
+        </form>
+    </td>
+</tr>
                     {% endfor %}
                 {% else %}
                     <tr>
@@ -203,31 +231,50 @@
                 {% if manejos %}
                     {% for m in manejos %}
                     <tr>
-                        <td>{{ m.animal }}</td>
-                        <td>{{ m.tipo_manejo }}</td>
-                        <td>{{ m.data_manejo }}</td>
-                        <td>{{ m.produto }}</td>
-                        <td>{{ m.dose }}</td>
-                        <td>{{ m.responsavel }}</td>
+    <td data-label="Animal">
+        {{ m.animal }}
+    </td>
 
-                        <td class="table-actions">
-                            <a href="{{ url_for('atualizar_manejo_route', id=m.id) }}"
-                            class="link-edit">
-                                Editar
-                            </a>
+    <td data-label="Tipo de manejo">
+        {{ m.tipo_manejo | replace('_', ' ') | title }}
+    </td>
 
-                            <form
-                                action="{{ url_for('remover_manejo_route', id=m.id) }}"
-                                method="POST"
-                                onsubmit="return confirm('Remover este manejo?');"
-                                class="inline-form"
-                            >
-                                <button type="submit" class="link-danger">
-                                    Remover
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
+    <td data-label="Data">
+        {{ m.data_manejo }}
+    </td>
+
+    <td data-label="Produto">
+        {{ m.produto if m.produto else '—' }}
+    </td>
+
+    <td data-label="Dose">
+        {{ m.dose if m.dose else '—' }}
+    </td>
+
+    <td data-label="Responsável">
+        {{ m.responsavel }}
+    </td>
+
+    <td data-label="Ações" class="table-actions">
+        <a
+            href="{{ url_for('atualizar_manejo_route', id=m.id) }}"
+            class="link-edit"
+        >
+            Editar
+        </a>
+
+        <form
+            action="{{ url_for('remover_manejo_route', id=m.id) }}"
+            method="POST"
+            onsubmit="return confirm('Remover este manejo?');"
+            class="inline-form"
+        >
+            <button type="submit" class="link-danger">
+                Remover
+            </button>
+        </form>
+    </td>
+</tr>
                     {% endfor %}
                 {% else %}
                     <tr>

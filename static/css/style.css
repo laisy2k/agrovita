@@ -504,7 +504,7 @@ tr:hover {
     width: 300px;
     height: auto;
     display: block;
-}\
+}
 
 /* ===== Página de registros ===== */
 
@@ -670,3 +670,447 @@ tr:hover {
     background: transparent !important;
     color: #8e0000 !important;
 }
+
+/* =========================
+   LOGIN - RESPONSIVIDADE
+========================= */
+
+@media (max-width: 550px) {
+
+    .login-container {
+        width: 100%;
+        padding: 28px 18px;
+    }
+
+    .login-container h1 {
+        font-size: 28px;
+        line-height: 1.2;
+        margin-bottom: 6px;
+    }
+
+    .login-container > p {
+        font-size: 15px;
+        margin-bottom: 20px;
+    }
+
+    .login-container form {
+        width: 100%;
+        padding: 24px 20px;
+        border-radius: 12px;
+    }
+
+    .login-container input {
+        width: 100%;
+    }
+
+    .login-container button {
+        width: 100%;
+        margin-top: 4px;
+    }
+
+    .login-container form p {
+        text-align: center;
+        font-size: 14px;
+        margin-top: 14px;
+    }
+
+}
+
+    /* =========================
+   MENU MOBILE
+========================= */
+
+.menu-toggle {
+    display: none;
+}
+
+@media (max-width: 900px) {
+
+    .header-content {
+        position: relative;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+    }
+
+    .logo-img {
+        width: 220px;
+    }
+
+    .menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        width: 42px;
+        height: 42px;
+
+        border: none;
+        border-radius: 8px;
+
+        background: transparent;
+        color: white;
+
+        font-size: 26px;
+        cursor: pointer;
+    }
+
+    .nav {
+        display: none;
+
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+
+        flex-direction: column;
+        gap: 0;
+
+        background: #2e7d32;
+
+        padding: 10px 0;
+
+        z-index: 1000;
+
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        border-radius: 0 0 14px 14px;
+        overflow: hidden;
+    }
+
+    .nav.active {
+        display: flex;
+    }
+
+    .nav a {
+        width: 100%;
+        padding: 12px 20px;
+
+        font-size: 15px;
+        text-align: left;
+    }
+
+    .nav a:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+@media (max-width: 550px) {
+
+    .logo-img {
+        width: 200px;
+    }
+
+    .menu-toggle {
+        width: 40px;
+        height: 40px;
+        font-size: 24px;
+    }
+}
+
+/* =========================
+   HOME - RESPONSIVIDADE
+========================= */
+
+@media (max-width: 550px) {
+
+    .main-content {
+        width: 92%;
+    }
+
+    .hero {
+        padding: 40px 28px;
+        border-radius: 12px;
+    }
+
+    .hero h2 {
+        font-size: 28px;
+        line-height: 1.3;
+    }
+}
+
+@media (max-width: 900px) {
+
+    body.menu-open::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+
+        background: rgba(0, 0, 0, 0.45);
+
+        z-index: 900;
+    }
+
+    .header {
+        position: relative;
+        z-index: 1000;
+    }
+
+    .nav {
+        z-index: 1001;
+    }
+
+    .menu-toggle {
+        position: relative;
+        z-index: 1002;
+    }
+}
+
+/* =========================
+   DASHBOARD - TABELAS MOBILE
+========================= */
+
+@media (max-width: 550px) {
+
+    .dashboard-section table thead {
+        display: none;
+    }
+
+    .dashboard-section table,
+    .dashboard-section tbody,
+    .dashboard-section tr,
+    .dashboard-section td {
+        display: block;
+        width: 100%;
+    }
+
+    .dashboard-section table {
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .dashboard-section tr {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 8px 16px;
+        margin-bottom: 12px;
+    }
+
+    .dashboard-section td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+
+        padding: 10px 0;
+        border-bottom: 1px solid #eeeeee;
+
+        text-align: right;
+    }
+
+    .dashboard-section td:last-child {
+        border-bottom: none;
+    }
+
+    .dashboard-section td::before {
+        content: attr(data-label);
+
+        font-weight: 600;
+        color: #555;
+        text-align: left;
+    }
+}
+
+/* =========================
+   USUÁRIOS - RESPONSIVIDADE
+========================= */
+
+@media (max-width: 550px) {
+
+    .usuarios-table thead {
+        display: none;
+    }
+
+    .usuarios-table,
+    .usuarios-table tbody,
+    .usuarios-table tr,
+    .usuarios-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .usuarios-table {
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .usuarios-table tr {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 8px 16px;
+        margin-bottom: 14px;
+    }
+
+    .usuarios-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+
+        padding: 11px 0;
+        border-bottom: 1px solid #eeeeee;
+
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
+    .usuarios-table td:last-child {
+        border-bottom: none;
+    }
+
+    .usuarios-table td::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+
+        font-weight: 600;
+        color: #555;
+        text-align: left;
+    }
+
+    .usuario-acoes {
+        justify-content: flex-end;
+    }
+}
+
+/* =========================
+   REGISTROS - MOBILE
+========================= */
+
+@media (max-width: 550px) {
+
+    .registros-card .table-container {
+        overflow: visible;
+    }
+
+    .registros-card table thead {
+        display: none;
+    }
+
+    .registros-card table,
+    .registros-card tbody,
+    .registros-card tr,
+    .registros-card td {
+        display: block;
+        width: 100%;
+    }
+
+    .registros-card table {
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .registros-card tbody tr {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 8px 16px;
+        margin-top: 16px;
+    }
+
+    .registros-card td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+
+        padding: 11px 0;
+        border-bottom: 1px solid #eeeeee;
+
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
+    .registros-card td:last-child {
+        border-bottom: none;
+    }
+
+    .registros-card td::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+
+        font-weight: 600;
+        color: #555;
+        text-align: left;
+    }
+
+    .registros-card .table-actions {
+        width: 100%;
+        min-width: 0;
+        justify-content: flex-end;
+    }
+
+    .registros-card .table-actions::before {
+    display: none;
+}
+
+.registros-card .table-actions {
+    justify-content: flex-end;
+    gap: 12px;
+}
+}
+
+    /* =========================
+    GERENCIAMENTO DE USUÁRIOS
+    ========================= */
+
+    .usuarios-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 28px;
+    }
+
+    .usuarios-form-card,
+    .usuarios-lista-card {
+        background: white;
+        border-radius: 12px;
+        padding: 28px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    }
+
+    .usuarios-form-card h3,
+    .usuarios-lista-card h3 {
+        color: #2e7d32;
+        font-size: 20px;
+        margin-bottom: 6px;
+    }
+
+    .usuarios-form-card > p,
+    .usuarios-lista-card > p {
+        color: #666;
+        margin-bottom: 22px;
+    }
+
+    .usuarios-form-card form {
+        width: 100%;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .usuarios-form-card input,
+    .usuarios-form-card select {
+        width: 100%;
+    }
+
+    .usuarios-lista-card .usuarios-table {
+        width: 100%;
+        margin-top: 10px;
+    }
+
+
+    /* MOBILE */
+    @media (max-width: 900px) {
+
+        .usuarios-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .usuarios-form-card,
+        .usuarios-lista-card {
+            padding: 24px 20px;
+        }
+    }
