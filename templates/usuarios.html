@@ -3,11 +3,25 @@
 {% block content %}
 
 <div class="container">
-    <h1>Gerenciamento de Usuários</h1>
 
-    <h2>Cadastrar novo usuário</h2>
+    <section class="page-header">
+        <span class="page-tag">CONTROLE DE ACESSO</span>
 
-<form method="POST">
+        <h2>Gerenciamento de usuários</h2>
+
+        <p>
+            Cadastre e gerencie os usuários que possuem acesso ao sistema.
+        </p>
+    </section>
+
+<div class="usuarios-grid">
+
+    <section class="usuarios-form-card">
+
+        <h3>Cadastrar novo usuário</h3>
+        <p>Crie uma conta e defina o nível de acesso ao sistema.</p>
+
+        <form method="POST">
     <label for="nome">Nome</label>
     <input type="text" id="nome" name="nome" required>
 
@@ -26,7 +40,14 @@
     <button type="submit">Cadastrar usuário</button>
 </form>
 
-    <table>
+    </section>
+
+    <section class="usuarios-lista-card">
+
+        <h3>Usuários cadastrados</h3>
+        <p>Gerencie as contas e os níveis de acesso ao sistema.</p>
+
+        <table class="usuarios-table">
         <thead>
             <tr>
                 <th>Nome</th>
@@ -39,31 +60,46 @@
         <tbody>
             {% for usuario in usuarios %}
             <tr>
-                <td>{{ usuario["nome"] }}</td>
-                <td>{{ usuario["email"] }}</td>
-                <td>{{ usuario["tipo"] }}</td>
-            <td>
-                <a href="{{ url_for('editar_usuario', id=usuario['id']) }}">
-                        Editar
-                </a>
-                <form
-                    method="POST"
-                    action="{{ url_for('excluir_usuario', id=usuario['id']) }}"
-                    style="display: inline;"
-                >
-                    <button type="submit">
-                    Excluir
-                    </button>
-    </form>
-            </td>
-            </tr>
+    <td data-label="Nome">
+        {{ usuario["nome"] }}
+    </td>
+
+    <td data-label="E-mail">
+        {{ usuario["email"] }}
+    </td>
+
+    <td data-label="Tipo">
+        {{ "Administrador" if usuario["tipo"] == "admin" else "Usuário comum" }}
+    </td>
+
+    <td data-label="Ações" class="usuario-acoes">
+        <a href="{{ url_for('editar_usuario', id=usuario['id']) }}">
+            Editar
+        </a>
+
+        <form
+            method="POST"
+            action="{{ url_for('excluir_usuario', id=usuario['id']) }}"
+            class="inline-form"
+        >
+            <button type="submit" class="link-danger">
+                Excluir
+            </button>
+        </form>
+    </td>
+</tr>
             {% else %}
             <tr>
                 <td colspan="4">Nenhum usuário cadastrado</td>
             </tr>
             {% endfor %}
         </tbody>
-    </table>
+        </table>
+
+    </section>
+
+</div>
+
 </div>
 
 {% endblock %}

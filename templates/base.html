@@ -33,7 +33,18 @@
         </div>
 
 {% if session.get("usuario_id") %}
-    <nav class="nav">
+
+    <button
+        class="menu-toggle"
+        type="button"
+        aria-label="Abrir menu"
+        aria-expanded="false"
+        onclick="toggleMenu()"
+    >
+        ☰
+    </button>
+
+    <nav class="nav" id="nav-menu">
         <a href="{{ url_for('inicio') }}">Início</a>
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
 
@@ -47,6 +58,7 @@
         <a href="{{ url_for('listagem') }}">Registros</a>
         <a href="{{ url_for('logout') }}">Sair</a>
     </nav>
+
 {% endif %}
 
     </div>
@@ -76,6 +88,21 @@
         </div>
 
     </footer>
+
+<script>
+    function toggleMenu() {
+        const menu = document.getElementById("nav-menu");
+        const button = document.querySelector(".menu-toggle");
+
+        menu.classList.toggle("active");
+        document.body.classList.toggle("menu-open");
+
+        const aberto = menu.classList.contains("active");
+
+        button.setAttribute("aria-expanded", aberto);
+        button.textContent = aberto ? "✕" : "☰";
+    }
+</script>
 
 </body>
 
