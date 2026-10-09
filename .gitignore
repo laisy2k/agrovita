@@ -217,3 +217,5 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 mediagro.db
+agrovita_teste.db
+python-dotenv==1.2.4
