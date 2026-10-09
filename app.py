@@ -1,13 +1,40 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import sqlite3 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
+from datetime import timedelta
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
+    SESSION_REFRESH_EACH_REQUEST=True
+)
+
+@app.before_request
+def verificar_inatividade():
+    if "usuario_id" not in session:
+        return
+
+    agora = datetime.now(timezone.utc).timestamp()
+    ultima_atividade = session.get("ultima_atividade")
+
+    if ultima_atividade is not None:
+        if agora - ultima_atividade > 30 * 60:
+            session.clear()
+            flash("Sua sessão expirou por inatividade. Faça login novamente.")
+            return redirect(url_for("login"))
+
+    session["ultima_atividade"] = agora
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_BANCO = os.path.join(BASE_DIR, "mediagro.db")
@@ -547,9 +574,11 @@ def login():
 
         if usuario and check_password_hash(usuario["senha"], senha):
             session.clear()
+            session.permanent = True
             session["usuario_id"] = usuario["id"]
             session["usuario_nome"] = usuario["nome"]
             session["usuario_tipo"] = usuario["tipo"]
+            session["ultima_atividade"] = datetime.now(timezone.utc).timestamp()
 
             return redirect(url_for("inicio"))
 
