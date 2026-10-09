@@ -7,7 +7,7 @@ import os
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = "agrovita-chave-secreta"
+app.secret_key = os.environ["SECRET_KEY"]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_BANCO = os.path.join(BASE_DIR, "mediagro.db")
@@ -20,6 +20,64 @@ def conectar_banco():
 def criar_tabelas():
     conexao = conectar_banco()
     cursor = conexao.cursor()
+    # Cria a tabela de usuários
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            senha TEXT NOT NULL,
+            tipo TEXT DEFAULT 'usuario'
+        )
+    """)
+
+    # Cria a tabela de animais
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS animais (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identificacao TEXT NOT NULL,
+            especie TEXT NOT NULL,
+            raca TEXT,
+            data_nascimento TEXT,
+            usuario_id INTEGER,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        )
+    """)
+
+    # Cria a tabela de manejos sanitários
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS manejos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            animal TEXT NOT NULL,
+            tipo_manejo TEXT NOT NULL,
+            data_manejo TEXT NOT NULL,
+            produto TEXT,
+            dose TEXT,
+            responsavel TEXT,
+            observacoes TEXT,
+            usuario_id INTEGER,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        )
+    """)
+
+    # Cria a tabela de vacinações
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS vacinacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            animal TEXT NOT NULL,
+            vacina TEXT NOT NULL,
+            lote TEXT,
+            fabricante TEXT,
+            data_aplicacao TEXT NOT NULL,
+            proxima_dose TEXT,
+            dose TEXT,
+            responsavel TEXT,
+            observacoes TEXT,
+            usuario_id INTEGER,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        )
+    """)
+
     cursor.execute("PRAGMA table_info(animais)")
     colunas_animais = [coluna[1] for coluna in cursor.fetchall()]
 
@@ -59,11 +117,19 @@ def criar_tabelas():
     admin = cursor.fetchone()
 
     if admin is None:
-        senha_hash = generate_password_hash("admin123")
+        senha_inicial = os.environ.get("ADMIN_INITIAL_PASSWORD")
+
+        if not senha_inicial:
+            raise RuntimeError(
+                "Configure ADMIN_INITIAL_PASSWORD para criar o administrador inicial."
+            )
+
+        senha_hash = generate_password_hash(senha_inicial)
+
         cursor.execute("""
-            INSERT INTO usuarios (nome, email, senha, tipo)
-            VALUES (?, ?, ?, ?)
-        """, ("Administrador", "admin@agrovita.com", senha_hash, "admin"))
+        INSERT INTO usuarios (nome, email, senha, tipo)
+        VALUES (?, ?, ?, ?)
+    """, ("Administrador", "admin@agrovita.com", senha_hash, "admin"))
 
     cursor.execute(
         "SELECT id FROM usuarios WHERE email = ?",
@@ -347,7 +413,22 @@ def remover_manejo(id, usuario_id):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "usuario_id" not in session:
+        usuario_id = session.get("usuario_id")
+
+        if usuario_id is None:
+            return redirect(url_for("login"))
+
+        conexao = conectar_banco()
+
+        usuario = conexao.execute(
+            "SELECT id FROM usuarios WHERE id = ?",
+            (usuario_id,)
+        ).fetchone()
+
+        conexao.close()
+
+        if usuario is None:
+            session.clear()
             return redirect(url_for("login"))
 
         return f(*args, **kwargs)
@@ -357,10 +438,26 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "usuario_id" not in session:
+        usuario_id = session.get("usuario_id")
+
+        if usuario_id is None:
             return redirect(url_for("login"))
 
-        if session.get("usuario_tipo") != "admin":
+        conexao = conectar_banco()
+
+        usuario = conexao.execute(
+            "SELECT tipo FROM usuarios WHERE id = ?",
+            (usuario_id,)
+        ).fetchone()
+
+        conexao.close()
+
+        if usuario is None:
+            session.clear()
+            return redirect(url_for("login"))
+
+        if usuario["tipo"] != "admin":
+            session["usuario_tipo"] = usuario["tipo"]
             flash("Acesso permitido apenas para administradores.")
             return redirect(url_for("inicio"))
 
@@ -449,6 +546,7 @@ def login():
         conexao.close()
 
         if usuario and check_password_hash(usuario["senha"], senha):
+            session.clear()
             session["usuario_id"] = usuario["id"]
             session["usuario_nome"] = usuario["nome"]
             session["usuario_tipo"] = usuario["tipo"]

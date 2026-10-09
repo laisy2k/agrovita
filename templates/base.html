@@ -66,6 +66,17 @@
 </header>
 
     <main class="container main-content">
+        {% with mensagens = get_flashed_messages() %}
+    {% if mensagens %}
+        <div class="mensagens-flash">
+            {% for mensagem in mensagens | unique %}
+                <div class="mensagem-flash">
+                    {{ mensagem }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
 
         {% block content %}
         {% endblock %}
