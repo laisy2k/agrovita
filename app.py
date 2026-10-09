@@ -30,6 +30,12 @@ def verificar_inatividade():
 
     if ultima_atividade is not None:
         if agora - ultima_atividade > 30 * 60:
+            registrar_log(
+                session["usuario_id"],
+                "SESSAO_EXPIRADA",
+                "Sessão encerrada após 30 minutos de inatividade"
+            )
+
             session.clear()
             flash("Sua sessão expirou por inatividade. Faça login novamente.")
             return redirect(url_for("login"))
@@ -44,9 +50,33 @@ def conectar_banco():
     conexao.row_factory = sqlite3.Row
     return conexao
 
+def registrar_log(usuario_id, acao, detalhes=None):
+    conexao = conectar_banco()
+
+    try:
+        conexao.execute("""
+            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+            VALUES (?, ?, ?)
+        """, (usuario_id, acao, detalhes))
+
+        conexao.commit()
+    finally:
+        conexao.close()
+
 def criar_tabelas():
     conexao = conectar_banco()
     cursor = conexao.cursor()
+        # Cria a tabela de logs de auditoria
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS logs_auditoria (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER,
+            acao TEXT NOT NULL,
+            detalhes TEXT,
+            data_hora TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Cria a tabela de usuários
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
@@ -194,25 +224,43 @@ def criar_animal(dados, usuario_id):
     conexao = conectar_banco()
     cursor = conexao.cursor()
 
-    cursor.execute("""
-        INSERT INTO animais (
-            identificacao,
-            especie,
-            raca,
-            data_nascimento,
+    try:
+        cursor.execute("""
+            INSERT INTO animais (
+                identificacao,
+                especie,
+                raca,
+                data_nascimento,
+                usuario_id
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            dados.get("identificacao"),
+            dados.get("especie"),
+            dados.get("raca"),
+            dados.get("data_nascimento"),
             usuario_id
-        )
-        VALUES (?, ?, ?, ?, ?)
-    """, (
-        dados.get("identificacao"),
-        dados.get("especie"),
-        dados.get("raca"),
-        dados.get("data_nascimento"),
-        usuario_id
-    ))
+        ))
 
-    conexao.commit()
-    conexao.close()
+        animal_id = cursor.lastrowid
+
+        cursor.execute("""
+            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+            VALUES (?, ?, ?)
+        """, (
+            usuario_id,
+            "CRIAR_ANIMAL",
+            f"Animal ID {animal_id} cadastrado"
+        ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
     
 def listar_animais(usuario_id):
     conexao = conectar_banco()
@@ -310,67 +358,118 @@ def buscar_animal(id, usuario_id):
 def atualizar_animal(id, dados, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute("""
-        UPDATE animais
-        SET identificacao = ?,
-            especie = ?,
-            raca = ?,
-            data_nascimento = ?
-        WHERE id = ? AND usuario_id = ?
-    """, (
-        dados.get("identificacao"),
-        dados.get("especie"),
-        dados.get("raca"),
-        dados.get("data_nascimento"),
-        id,
-        usuario_id
-    ))
+    try:
+        cursor = conexao.execute("""
+            UPDATE animais
+            SET identificacao = ?,
+                especie = ?,
+                raca = ?,
+                data_nascimento = ?
+            WHERE id = ? AND usuario_id = ?
+        """, (
+            dados.get("identificacao"),
+            dados.get("especie"),
+            dados.get("raca"),
+            dados.get("data_nascimento"),
+            id,
+            usuario_id
+        ))
 
-    conexao.commit()
-    conexao.close()
+        if cursor.rowcount > 0:
+            conexao.execute("""
+                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+                VALUES (?, ?, ?)
+            """, (
+                usuario_id,
+                "EDITAR_ANIMAL",
+                f"Animal ID {id} atualizado"
+            ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
 
 
 def remover_animal(id, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute(
-        "DELETE FROM animais WHERE id = ? AND usuario_id = ?",
-        (id, usuario_id)
-    )
+    try:
+        cursor = conexao.execute(
+            "DELETE FROM animais WHERE id = ? AND usuario_id = ?",
+            (id, usuario_id)
+        )
 
-    conexao.commit()
-    conexao.close()
-    
+        if cursor.rowcount > 0:
+            conexao.execute("""
+                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+                VALUES (?, ?, ?)
+            """, (
+                usuario_id,
+                "EXCLUIR_ANIMAL",
+                f"Animal ID {id} excluído"
+            ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
 
 # controle de manejo
 def criar_manejo(dados, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute("""
-        INSERT INTO manejos (
-            animal,
-            tipo_manejo,
-            data_manejo,
-            produto,
-            dose,
-            responsavel,
-            observacoes,
+    try:
+        cursor = conexao.execute("""
+            INSERT INTO manejos (
+                animal,
+                tipo_manejo,
+                data_manejo,
+                produto,
+                dose,
+                responsavel,
+                observacoes,
+                usuario_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            dados.get("animal"),
+            dados.get("tipo_manejo"),
+            dados.get("data_manejo"),
+            dados.get("produto"),
+            dados.get("dose"),
+            dados.get("responsavel"),
+            dados.get("observacoes"),
             usuario_id
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        dados.get("animal"),
-        dados.get("tipo_manejo"),
-        dados.get("data_manejo"),
-        dados.get("produto"),
-        dados.get("dose"),
-        dados.get("responsavel"),
-        dados.get("observacoes"),
-        usuario_id
-    ))
+        ))
 
-    conexao.commit()
-    conexao.close()
+        manejo_id = cursor.lastrowid
+
+        conexao.execute("""
+            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+            VALUES (?, ?, ?)
+        """, (
+            usuario_id,
+            "CRIAR_MANEJO",
+            f"Manejo ID {manejo_id} cadastrado"
+        ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
 
 
 def listar_manejos(usuario_id):
@@ -400,43 +499,79 @@ def buscar_manejo(id, usuario_id):
 def atualizar_manejo(id, dados, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute("""
-        UPDATE manejos
-        SET animal = ?,
-            tipo_manejo = ?,
-            data_manejo = ?,
-            produto = ?,
-            dose = ?,
-            responsavel = ?,
-            observacoes = ?
-        WHERE id = ? AND usuario_id = ?
-    """, (
-        dados.get("animal"),
-        dados.get("tipo_manejo"),
-        dados.get("data_manejo"),
-        dados.get("produto"),
-        dados.get("dose"),
-        dados.get("responsavel"),
-        dados.get("observacoes"),
-        id,
-        usuario_id
-    ))
+    try:
+        cursor = conexao.execute("""
+            UPDATE manejos
+            SET animal = ?,
+                tipo_manejo = ?,
+                data_manejo = ?,
+                produto = ?,
+                dose = ?,
+                responsavel = ?,
+                observacoes = ?
+            WHERE id = ? AND usuario_id = ?
+        """, (
+            dados.get("animal"),
+            dados.get("tipo_manejo"),
+            dados.get("data_manejo"),
+            dados.get("produto"),
+            dados.get("dose"),
+            dados.get("responsavel"),
+            dados.get("observacoes"),
+            id,
+            usuario_id
+        ))
 
-    conexao.commit()
-    conexao.close()
+        if cursor.rowcount > 0:
+            conexao.execute("""
+                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+                VALUES (?, ?, ?)
+            """, (
+                usuario_id,
+                "EDITAR_MANEJO",
+                f"Manejo ID {id} atualizado"
+            ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
 
 
 def remover_manejo(id, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute(
-        "DELETE FROM manejos WHERE id = ? AND usuario_id = ?",
-        (id, usuario_id)
-    )
+    try:
+        cursor = conexao.execute(
+            "DELETE FROM manejos WHERE id = ? AND usuario_id = ?",
+            (id, usuario_id)
+        )
 
-    conexao.commit()
-    conexao.close()
-    
+        if cursor.rowcount > 0:
+            conexao.execute("""
+                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+                VALUES (?, ?, ?)
+            """, (
+                usuario_id,
+                "EXCLUIR_MANEJO",
+                f"Manejo ID {id} excluído"
+            ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
+
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -484,6 +619,12 @@ def admin_required(f):
             return redirect(url_for("login"))
 
         if usuario["tipo"] != "admin":
+            registrar_log(
+                usuario_id,
+                "ACESSO_NEGADO",
+                "Tentativa de acesso a uma área administrativa"
+            )
+
             session["usuario_tipo"] = usuario["tipo"]
             flash("Acesso permitido apenas para administradores.")
             return redirect(url_for("inicio"))
@@ -579,6 +720,11 @@ def login():
             session["usuario_nome"] = usuario["nome"]
             session["usuario_tipo"] = usuario["tipo"]
             session["ultima_atividade"] = datetime.now(timezone.utc).timestamp()
+            registrar_log(
+                usuario["id"],
+                "LOGIN",
+                "Login realizado com sucesso"
+            )
 
             return redirect(url_for("inicio"))
 
@@ -591,6 +737,11 @@ def login():
 
 @app.route("/logout")
 def logout():
+    registrar_log(
+    session.get("usuario_id"),
+    "LOGOUT",
+    "Logout realizado pelo usuário"
+)
     session.clear()
     return redirect(url_for("login"))
 
@@ -658,35 +809,53 @@ def listagem():
 def criar_vacinacao(dados, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute("""
-        INSERT INTO vacinacoes (
-            animal,
-            vacina,
-            lote,
-            fabricante,
-            data_aplicacao,
-            proxima_dose,
-            dose,
-            responsavel,
-            observacoes,
+    try:
+        cursor = conexao.execute("""
+            INSERT INTO vacinacoes (
+                animal,
+                vacina,
+                lote,
+                fabricante,
+                data_aplicacao,
+                proxima_dose,
+                dose,
+                responsavel,
+                observacoes,
+                usuario_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            dados.get("animal"),
+            dados.get("vacina"),
+            dados.get("lote"),
+            dados.get("fabricante"),
+            dados.get("data_aplicacao"),
+            dados.get("proxima_dose"),
+            dados.get("dose"),
+            dados.get("responsavel"),
+            dados.get("observacoes"),
             usuario_id
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        dados.get("animal"),
-        dados.get("vacina"),
-        dados.get("lote"),
-        dados.get("fabricante"),
-        dados.get("data_aplicacao"),
-        dados.get("proxima_dose"),
-        dados.get("dose"),
-        dados.get("responsavel"),
-        dados.get("observacoes"),
-        usuario_id
-    ))
+        ))
 
-    conexao.commit()
-    conexao.close()
+        vacinacao_id = cursor.lastrowid
+
+        conexao.execute("""
+            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+            VALUES (?, ?, ?)
+        """, (
+            usuario_id,
+            "CRIAR_VACINACAO",
+            f"Vacinação ID {vacinacao_id} cadastrada"
+        ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
 
 
 def listar_vacinacoes(usuario_id):
@@ -726,46 +895,80 @@ def buscar_vacinacao(id, usuario_id):
 def atualizar_vacinacao(id, dados, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute("""
-        UPDATE vacinacoes
-        SET animal = ?,
-            vacina = ?,
-            lote = ?,
-            fabricante = ?,
-            data_aplicacao = ?,
-            proxima_dose = ?,
-            dose = ?,
-            responsavel = ?,
-            observacoes = ?
-        WHERE id = ? AND usuario_id = ?
-    """, (
-        dados.get("animal"),
-        dados.get("vacina"),
-        dados.get("lote"),
-        dados.get("fabricante"),
-        dados.get("data_aplicacao"),
-        dados.get("proxima_dose"),
-        dados.get("dose"),
-        dados.get("responsavel"),
-        dados.get("observacoes"),
-        id,
-        usuario_id
-    ))
+    try:
+        cursor = conexao.execute("""
+            UPDATE vacinacoes
+            SET animal = ?,
+                vacina = ?,
+                lote = ?,
+                fabricante = ?,
+                data_aplicacao = ?,
+                proxima_dose = ?,
+                dose = ?,
+                responsavel = ?,
+                observacoes = ?
+            WHERE id = ? AND usuario_id = ?
+        """, (
+            dados.get("animal"),
+            dados.get("vacina"),
+            dados.get("lote"),
+            dados.get("fabricante"),
+            dados.get("data_aplicacao"),
+            dados.get("proxima_dose"),
+            dados.get("dose"),
+            dados.get("responsavel"),
+            dados.get("observacoes"),
+            id,
+            usuario_id
+        ))
 
-    conexao.commit()
-    conexao.close()
+        if cursor.rowcount > 0:
+            conexao.execute("""
+                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+                VALUES (?, ?, ?)
+            """, (
+                usuario_id,
+                "EDITAR_VACINACAO",
+                f"Vacinação ID {id} atualizada"
+            ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
 
 
 def remover_vacinacao(id, usuario_id):
     conexao = conectar_banco()
 
-    conexao.execute(
-        "DELETE FROM vacinacoes WHERE id = ? AND usuario_id = ?",
-        (id, usuario_id)
-    )
+    try:
+        cursor = conexao.execute(
+            "DELETE FROM vacinacoes WHERE id = ? AND usuario_id = ?",
+            (id, usuario_id)
+        )
 
-    conexao.commit()
-    conexao.close()
+        if cursor.rowcount > 0:
+            conexao.execute("""
+                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+                VALUES (?, ?, ?)
+            """, (
+                usuario_id,
+                "EXCLUIR_VACINACAO",
+                f"Vacinação ID {id} excluída"
+            ))
+
+        conexao.commit()
+
+    except Exception:
+        conexao.rollback()
+        raise
+
+    finally:
+        conexao.close()
 
 def status_vacina(proxima_dose):
     if not proxima_dose:
