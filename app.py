@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from datetime import date, datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -634,20 +634,34 @@ def admin_required(f):
     return decorated_function
 
 @app.route("/cadastro-usuario", methods=["GET", "POST"])
+@admin_required
 def cadastro_usuario():
     if request.method == "POST":
-        nome = request.form["nome"]
-        email = request.form["email"]
-        senha = request.form["senha"]
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+
+        if not nome or not email or not senha.strip():
+            return render_template(
+                "cadastro_usuario.html",
+                erro="Preencha todos os campos obrigatórios."
+            )
+
+        if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            return render_template(
+                "cadastro_usuario.html",
+                erro="Informe um e-mail válido."
+            )
 
         conexao = conectar_banco()
 
-        usuario_existente = conexao.execute(
-            "SELECT id FROM usuarios WHERE email = ?",
-            (email,)
-        ).fetchone()
-
-        conexao.close()
+        try:
+            usuario_existente = conexao.execute(
+                "SELECT id FROM usuarios WHERE email = ?",
+                (email,)
+            ).fetchone()
+        finally:
+            conexao.close()
 
         if usuario_existente:
             return render_template(
@@ -656,7 +670,7 @@ def cadastro_usuario():
             )
 
         criar_usuario(nome, email, senha, "usuario")
-
+        flash("Conta criada com sucesso! Faça login.", "sucesso")
         return redirect(url_for("login"))
 
     return render_template("cadastro_usuario.html")
@@ -750,17 +764,32 @@ def logout():
 @login_required
 def manejo():
     if request.method == "POST":
-        criar_manejo({
-            "animal": request.form.get("animal"),
-            "tipo_manejo": request.form.get("tipo_manejo"),
-            "data_manejo": request.form.get("data_manejo"),
-            "produto": request.form.get("produto"),
-            "dose": request.form.get("dose"),
-            "responsavel": request.form.get("responsavel"),
-            "observacoes": request.form.get("observacoes")
-        }, session["usuario_id"])
+        dados = {
+            "animal": request.form.get("animal", "").strip(),
+            "tipo_manejo": request.form.get("tipo_manejo", "").strip(),
+            "data_manejo": request.form.get("data_manejo", "").strip(),
+            "produto": request.form.get("produto", "").strip(),
+            "dose": request.form.get("dose", "").strip(),
+            "responsavel": request.form.get("responsavel", "").strip(),
+            "observacoes": request.form.get("observacoes", "").strip(),
+        }
 
+        obrigatorios = ("animal", "tipo_manejo", "data_manejo", "responsavel")
+
+        if any(not dados[campo] for campo in obrigatorios):
+            flash("Preencha todos os campos obrigatórios.", "erro")
+            return render_template("manejo.html")
+
+        try:
+            date.fromisoformat(dados["data_manejo"])
+        except ValueError:
+            flash("Informe uma data de manejo válida.", "erro")
+            return render_template("manejo.html")
+
+        criar_manejo(dados, session["usuario_id"])
+        flash("Manejo cadastrado com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
+
     return render_template("manejo.html")
 
 @app.route("/manejo/atualizar/<int:id>", methods=["GET", "POST"])
@@ -772,16 +801,30 @@ def atualizar_manejo_route(id):
         return redirect(url_for("listagem"))
 
     if request.method == "POST":
-        atualizar_manejo(id, {
-            "animal": request.form.get("animal"),
-            "tipo_manejo": request.form.get("tipo_manejo"),
-            "data_manejo": request.form.get("data_manejo"),
-            "produto": request.form.get("produto"),
-            "dose": request.form.get("dose"),
-            "responsavel": request.form.get("responsavel"),
-            "observacoes": request.form.get("observacoes")
-        }, session["usuario_id"])
+        dados = {
+            "animal": request.form.get("animal", "").strip(),
+            "tipo_manejo": request.form.get("tipo_manejo", "").strip(),
+            "data_manejo": request.form.get("data_manejo", "").strip(),
+            "produto": request.form.get("produto", "").strip(),
+            "dose": request.form.get("dose", "").strip(),
+            "responsavel": request.form.get("responsavel", "").strip(),
+            "observacoes": request.form.get("observacoes", "").strip(),
+        }
 
+        obrigatorios = ("animal", "tipo_manejo", "data_manejo", "responsavel")
+
+        if any(not dados[campo] for campo in obrigatorios):
+            flash("Preencha todos os campos obrigatórios.", "erro")
+            return render_template("manejo.html", registro=registro)
+
+        try:
+            date.fromisoformat(dados["data_manejo"])
+        except ValueError:
+            flash("Informe uma data de manejo válida.", "erro")
+            return render_template("manejo.html", registro=registro)
+
+        atualizar_manejo(id, dados, session["usuario_id"])
+        flash("Manejo atualizado com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
     return render_template("manejo.html", registro=registro)
@@ -1008,16 +1051,27 @@ def inicio():
 @app.route("/cadastro", methods=["GET", "POST"])
 @login_required
 def cadastro():
-
     if request.method == "POST":
+        dados = {
+            "identificacao": request.form.get("identificacao", "").strip(),
+            "especie": request.form.get("especie", "").strip(),
+            "raca": request.form.get("raca", "").strip(),
+            "data_nascimento": request.form.get("data_nascimento", "").strip(),
+        }
 
-        criar_animal({ 
-    "identificacao": request.form.get("identificacao"), 
-    "especie": request.form.get("especie"), 
-    "raca": request.form.get("raca"), 
-    "data_nascimento": request.form.get("data_nascimento"), 
-}, session["usuario_id"])
+        if not dados["identificacao"] or not dados["especie"]:
+            flash("Identificação e espécie são obrigatórias.", "erro")
+            return render_template("cadastro.html")
 
+        if dados["data_nascimento"]:
+            try:
+                date.fromisoformat(dados["data_nascimento"])
+            except ValueError:
+                flash("Informe uma data de nascimento válida.", "erro")
+                return render_template("cadastro.html")
+
+        criar_animal(dados, session["usuario_id"])
+        flash("Animal cadastrado com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
     return render_template("cadastro.html")
@@ -1027,21 +1081,42 @@ def cadastro():
 @admin_required
 def usuarios():
     if request.method == "POST":
-        nome = request.form["nome"]
-        email = request.form["email"]
-        senha = request.form["senha"]
-        tipo = request.form["tipo"]
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+        tipo = request.form.get("tipo", "").strip()
+
+        if not nome or not email or not senha.strip() or not tipo:
+            flash("Preencha todos os campos obrigatórios.", "erro")
+            return redirect(url_for("usuarios"))
+
+        if tipo not in ("usuario", "admin"):
+            flash("Tipo de usuário inválido.", "erro")
+            return redirect(url_for("usuarios"))
+
+        if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            flash("Informe um e-mail válido.", "erro")
+            return redirect(url_for("usuarios"))
+
+        conexao = conectar_banco()
+        try:
+            usuario_existente = conexao.execute(
+                "SELECT id FROM usuarios WHERE email = ?",
+                (email,)
+            ).fetchone()
+        finally:
+            conexao.close()
+
+        if usuario_existente:
+            flash("Já existe uma conta com esse e-mail.", "erro")
+            return redirect(url_for("usuarios"))
 
         criar_usuario(nome, email, senha, tipo)
-
+        flash("Usuário cadastrado com sucesso!", "sucesso")
         return redirect(url_for("usuarios"))
 
     usuarios = listar_usuarios()
-
-    return render_template(
-        "usuarios.html",
-        usuarios=usuarios
-    )
+    return render_template("usuarios.html", usuarios=usuarios)
 
 # Edição de animal
 @app.route("/animais/atualizar/<int:id>", methods=["GET", "POST"])
@@ -1053,15 +1128,27 @@ def atualizar_animal_route(id):
         return redirect(url_for("listagem"))
 
     if request.method == "POST":
-        atualizar_animal(id, {
-            "identificacao": request.form.get("identificacao"),
-            "especie": request.form.get("especie"),
-            "raca": request.form.get("raca"),
-            "data_nascimento": request.form.get("data_nascimento"),
-        }, session["usuario_id"])
-        
-        
+        dados = {
+            "identificacao": request.form.get("identificacao", "").strip(),
+            "especie": request.form.get("especie", "").strip(),
+            "raca": request.form.get("raca", "").strip(),
+            "data_nascimento": request.form.get("data_nascimento", "").strip(),
+        }
 
+        if not dados["identificacao"] or not dados["especie"]:
+            flash("Identificação e espécie são obrigatórias.", "erro")
+            return render_template("cadastro.html", animal=animal)
+
+        if dados["data_nascimento"]:
+            try:
+                date.fromisoformat(dados["data_nascimento"])
+            except ValueError:
+                flash("Informe uma data de nascimento válida.", "erro")
+                return render_template("cadastro.html", animal=animal)
+
+        atualizar_animal(id, dados, session["usuario_id"])
+
+        flash("Animal atualizado com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
     return render_template("cadastro.html", animal=animal)
@@ -1080,20 +1167,33 @@ def remover_animal_route(id):
 @app.route("/vacinacao", methods=["GET", "POST"])
 @login_required
 def vacinacao():
-
     if request.method == "POST":
-        criar_vacinacao({
-            "animal": request.form.get("animal"),
-            "vacina": request.form.get("vacina"),
-            "lote": request.form.get("lote"),
-            "fabricante": request.form.get("fabricante"),
-            "data_aplicacao": request.form.get("data_aplicacao"),
-            "proxima_dose": request.form.get("proxima_dose"),
-            "dose": request.form.get("dose"),
-            "responsavel": request.form.get("responsavel"),
-            "observacoes": request.form.get("observacoes"),
-        }, session["usuario_id"])
+        dados = {
+            "animal": request.form.get("animal", "").strip(),
+            "vacina": request.form.get("vacina", "").strip(),
+            "lote": request.form.get("lote", "").strip(),
+            "fabricante": request.form.get("fabricante", "").strip(),
+            "data_aplicacao": request.form.get("data_aplicacao", "").strip(),
+            "proxima_dose": request.form.get("proxima_dose", "").strip(),
+            "dose": request.form.get("dose", "").strip(),
+            "responsavel": request.form.get("responsavel", "").strip(),
+            "observacoes": request.form.get("observacoes", "").strip(),
+        }
 
+        if not dados["animal"] or not dados["vacina"] or not dados["data_aplicacao"]:
+            flash("Animal, vacina e data de aplicação são obrigatórios.", "erro")
+            return render_template("vacinacao.html")
+
+        for campo in ("data_aplicacao", "proxima_dose"):
+            if dados[campo]:
+                try:
+                    date.fromisoformat(dados[campo])
+                except ValueError:
+                    flash("Informe datas válidas no formato AAAA-MM-DD.", "erro")
+                    return render_template("vacinacao.html")
+
+        criar_vacinacao(dados, session["usuario_id"])
+        flash("Vacinação cadastrada com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
     return render_template("vacinacao.html")
@@ -1103,25 +1203,38 @@ def vacinacao():
 @app.route("/vacinacao/atualizar/<int:id>", methods=["GET", "POST"])
 @login_required
 def atualizar_vacinacao_route(id):
-
     registro = buscar_vacinacao(id, session["usuario_id"])
 
     if registro is None:
         return redirect(url_for("listagem"))
 
     if request.method == "POST":
-        atualizar_vacinacao(id, {
-            "animal": request.form.get("animal"),
-            "vacina": request.form.get("vacina"),
-            "lote": request.form.get("lote"),
-            "fabricante": request.form.get("fabricante"),
-            "data_aplicacao": request.form.get("data_aplicacao"),
-            "proxima_dose": request.form.get("proxima_dose"),
-            "dose": request.form.get("dose"),
-            "responsavel": request.form.get("responsavel"),
-            "observacoes": request.form.get("observacoes"),
-        }, session["usuario_id"])
+        dados = {
+            "animal": request.form.get("animal", "").strip(),
+            "vacina": request.form.get("vacina", "").strip(),
+            "lote": request.form.get("lote", "").strip(),
+            "fabricante": request.form.get("fabricante", "").strip(),
+            "data_aplicacao": request.form.get("data_aplicacao", "").strip(),
+            "proxima_dose": request.form.get("proxima_dose", "").strip(),
+            "dose": request.form.get("dose", "").strip(),
+            "responsavel": request.form.get("responsavel", "").strip(),
+            "observacoes": request.form.get("observacoes", "").strip(),
+        }
 
+        if not dados["animal"] or not dados["vacina"] or not dados["data_aplicacao"]:
+            flash("Animal, vacina e data de aplicação são obrigatórios.", "erro")
+            return render_template("vacinacao.html", registro=registro)
+
+        for campo in ("data_aplicacao", "proxima_dose"):
+            if dados[campo]:
+                try:
+                    date.fromisoformat(dados[campo])
+                except ValueError:
+                    flash("Informe datas válidas no formato AAAA-MM-DD.", "erro")
+                    return render_template("vacinacao.html", registro=registro)
+
+        atualizar_vacinacao(id, dados, session["usuario_id"])
+        flash("Vacinação atualizada com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
     return render_template("vacinacao.html", registro=registro)
@@ -1179,6 +1292,224 @@ def dashboard():
         vacinacoes_em_dia=vacinacoes_em_dia,
         vacinacoes_hoje=vacinacoes_hoje,
     )
+# API REST — CRUD de animais, manejos e vacinações
+
+API_RECURSOS = {
+    "animais": {
+        "colunas": (
+            "identificacao", "especie", "raca", "data_nascimento"
+        ),
+        "obrigatorios": ("identificacao", "especie"),
+        "datas": ("data_nascimento",),
+    },
+    "manejos": {
+        "colunas": (
+            "animal", "tipo_manejo", "data_manejo",
+            "produto", "dose", "responsavel", "observacoes"
+        ),
+        "obrigatorios": ("animal", "tipo_manejo", "data_manejo"),
+        "datas": ("data_manejo",),
+    },
+    "vacinacoes": {
+        "colunas": (
+            "animal", "vacina", "lote", "fabricante",
+            "data_aplicacao", "proxima_dose", "dose",
+            "responsavel", "observacoes"
+        ),
+        "obrigatorios": ("animal", "vacina", "data_aplicacao"),
+        "datas": ("data_aplicacao", "proxima_dose"),
+    },
+}
+
+
+def validar_dados_api(recurso, dados):
+    """Valida os campos recebidos pela API antes de acessar o banco."""
+    if not isinstance(dados, dict):
+        return "Envie um objeto JSON válido."
+
+    config = API_RECURSOS[recurso]
+    permitidas = set(config["colunas"])
+
+    campos_desconhecidos = set(dados) - permitidas
+    if campos_desconhecidos:
+        return "Existem campos não permitidos na requisição."
+
+    for campo in config["obrigatorios"]:
+        valor = dados.get(campo)
+
+        if not isinstance(valor, str) or not valor.strip():
+            return f"O campo '{campo}' é obrigatório."
+
+    for campo in config["colunas"]:
+        valor = dados.get(campo)
+
+        if valor is not None and not isinstance(valor, str):
+            return f"O campo '{campo}' deve ser texto."
+
+    for campo in config["datas"]:
+        valor = dados.get(campo)
+
+        if valor:
+            try:
+                date.fromisoformat(valor)
+            except ValueError:
+                return f"O campo '{campo}' deve usar o formato AAAA-MM-DD."
+
+    return None
+
+
+@app.route("/api/<string:recurso>", methods=["GET", "POST"])
+@login_required
+def api_colecao(recurso):
+    if recurso not in API_RECURSOS:
+        return jsonify({"erro": "Recurso não encontrado."}), 404
+
+    usuario_id = session["usuario_id"]
+    config = API_RECURSOS[recurso]
+    conexao = conectar_banco()
+
+    try:
+        if request.method == "GET":
+            registros = conexao.execute(
+                f"SELECT * FROM {recurso} WHERE usuario_id = ?",
+                (usuario_id,)
+            ).fetchall()
+
+            return jsonify([dict(registro) for registro in registros]), 200
+
+        dados = request.get_json(silent=True)
+        erro = validar_dados_api(recurso, dados)
+
+        if erro:
+            return jsonify({"erro": erro}), 400
+
+        colunas = config["colunas"]
+        valores = [dados.get(campo) or None for campo in colunas]
+
+        nomes_sql = ", ".join(colunas)
+        marcadores = ", ".join("?" for _ in colunas)
+
+        cursor = conexao.execute(
+            f"""
+            INSERT INTO {recurso} ({nomes_sql}, usuario_id)
+            VALUES ({marcadores}, ?)
+            """,
+            (*valores, usuario_id)
+        )
+
+        registro_id = cursor.lastrowid
+
+        conexao.execute(
+            """
+            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+            VALUES (?, ?, ?)
+            """,
+            (
+                usuario_id,
+                f"CRIAR_{recurso.upper()}",
+                f"Registro ID {registro_id} criado pela API"
+            )
+        )
+
+        conexao.commit()
+
+        registro = conexao.execute(
+            f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?",
+            (registro_id, usuario_id)
+        ).fetchone()
+
+        return jsonify(dict(registro)), 201
+
+    finally:
+        conexao.close()
+
+
+@app.route("/api/<string:recurso>/<int:registro_id>",methods=["GET", "PUT", "DELETE"])
+@login_required
+def api_registro(recurso, registro_id):
+    if recurso not in API_RECURSOS:
+        return jsonify({"erro": "Recurso não encontrado."}), 404
+
+    usuario_id = session["usuario_id"]
+    config = API_RECURSOS[recurso]
+    conexao = conectar_banco()
+
+    try:
+        registro = conexao.execute(
+            f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?",
+            (registro_id, usuario_id)
+        ).fetchone()
+
+        if registro is None:
+            return jsonify({"erro": "Registro não encontrado."}), 404
+
+        if request.method == "GET":
+            return jsonify(dict(registro)), 200
+
+        if request.method == "DELETE":
+            conexao.execute(
+                f"DELETE FROM {recurso} WHERE id = ? AND usuario_id = ?",
+                (registro_id, usuario_id)
+            )
+
+            conexao.execute(
+                """
+                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    usuario_id,
+                    f"EXCLUIR_{recurso.upper()}",
+                    f"Registro ID {registro_id} excluído pela API"
+                )
+            )
+
+            conexao.commit()
+            return jsonify({"mensagem": "Registro excluído com sucesso."}), 200
+
+        dados = request.get_json(silent=True)
+        erro = validar_dados_api(recurso, dados)
+
+        if erro:
+            return jsonify({"erro": erro}), 400
+
+        colunas = config["colunas"]
+        atribuicoes = ", ".join(f"{campo} = ?" for campo in colunas)
+        valores = [dados.get(campo) or None for campo in colunas]
+
+        conexao.execute(
+            f"""
+            UPDATE {recurso}
+            SET {atribuicoes}
+            WHERE id = ? AND usuario_id = ?
+            """,
+            (*valores, registro_id, usuario_id)
+        )
+
+        conexao.execute(
+            """
+            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
+            VALUES (?, ?, ?)
+            """,
+            (
+                usuario_id,
+                f"ATUALIZAR_{recurso.upper()}",
+                f"Registro ID {registro_id} atualizado pela API"
+            )
+        )
+
+        conexao.commit()
+
+        atualizado = conexao.execute(
+            f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?",
+            (registro_id, usuario_id)
+        ).fetchone()
+
+        return jsonify(dict(atualizado)), 200
+
+    finally:
+        conexao.close()
+
 
 if __name__ == "__main__":
     app.run(debug=True)
