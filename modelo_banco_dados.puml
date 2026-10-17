@@ -1,40 +1,72 @@
-@startuml
 
-title Modelo de Banco de Dados - AgroVita
+@startuml Fisico
+title Modelo Fisico do Banco de Dados - AgroVita
 
-entity "animais" as animais {
-    * id : INTEGER <<PK>>
+hide methods
+hide stereotypes
+skinparam linetype ortho
+
+entity "usuarios" as usuarios {
+    * id : BIGINT <<PK>>
     --
-    identificacao : TEXT
-    especie : TEXT
-    raca : TEXT
-    data_nascimento : TEXT
+    nome : VARCHAR(100) NOT NULL
+    email : VARCHAR(150) NOT NULL UNIQUE
+    senha : VARCHAR(255) NOT NULL
+    tipo : VARCHAR(20) NOT NULL
 }
 
-entity "vacinacoes" as vacinacoes {
-    * id : INTEGER <<PK>>
+entity "animais" as animais {
+    * id : BIGINT <<PK>>
     --
-    animal : TEXT
-    vacina : TEXT
-    lote : TEXT
-    fabricante : TEXT
-    data_aplicacao : TEXT
-    proxima_dose : TEXT
-    dose : TEXT
-    responsavel : TEXT
-    observacoes : TEXT
+    identificacao : VARCHAR(100) NOT NULL
+    especie : VARCHAR(80) NOT NULL
+    raca : VARCHAR(100) NULL
+    data_nascimento : DATE NULL
+    usuario_id : BIGINT NOT NULL <<FK>>
 }
 
 entity "manejos" as manejos {
-    * id : INTEGER <<PK>>
+    * id : BIGINT <<PK>>
     --
-    animal : TEXT
-    tipo_manejo : TEXT
-    data_manejo : TEXT
-    produto : TEXT
-    dose : TEXT
-    responsavel : TEXT
-    observacoes : TEXT
+    animal_id : BIGINT NOT NULL <<FK>>
+    usuario_id : BIGINT NOT NULL <<FK>>
+    tipo_manejo : VARCHAR(100) NOT NULL
+    data_manejo : DATE NOT NULL
+    produto : VARCHAR(150) NULL
+    dose : VARCHAR(100) NULL
+    responsavel : VARCHAR(150) NOT NULL
+    observacoes : TEXT NULL
 }
+
+entity "vacinacoes" as vacinacoes {
+    * id : BIGINT <<PK>>
+    --
+    animal_id : BIGINT NOT NULL <<FK>>
+    usuario_id : BIGINT NOT NULL <<FK>>
+    vacina : VARCHAR(150) NOT NULL
+    lote : VARCHAR(100) NULL
+    fabricante : VARCHAR(150) NULL
+    data_aplicacao : DATE NOT NULL
+    proxima_dose : DATE NULL
+    dose : VARCHAR(100) NULL
+    responsavel : VARCHAR(150) NULL
+    observacoes : TEXT NULL
+}
+
+entity "logs_auditoria" as logs {
+    * id : BIGINT <<PK>>
+    --
+    usuario_id : BIGINT NULL <<FK>>
+    acao : VARCHAR(100) NOT NULL
+    detalhes : TEXT NULL
+    data_hora : DATETIME NOT NULL
+}
+
+usuarios ||--o{ animais : cadastra
+usuarios ||--o{ manejos : registra
+usuarios ||--o{ vacinacoes : registra
+usuarios |o--o{ logs : realiza
+animais ||--o{ manejos : possui
+animais ||--o{ vacinacoes : recebe
 
 @enduml

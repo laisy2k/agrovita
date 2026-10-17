@@ -1,0 +1,72 @@
+
+@startuml Logico
+title Modelo Logico do Banco de Dados - AgroVita
+
+hide methods
+hide stereotypes
+skinparam linetype ortho
+
+entity "USUARIOS" as usuarios {
+    * id : identificador
+    --
+    nome
+    email
+    senha
+    tipo
+}
+
+entity "ANIMAIS" as animais {
+    * id : identificador
+    --
+    identificacao
+    especie
+    raca
+    data_nascimento
+    usuario_id : FK
+}
+
+entity "MANEJOS" as manejos {
+    * id : identificador
+    --
+    animal_id
+    usuario_id
+    tipo_manejo
+    data_manejo
+    produto
+    dose
+    responsavel
+    observacoes
+}
+
+entity "VACINACOES" as vacinacoes {
+    * id : identificador
+    --
+    animal_id
+    usuario_id
+    vacina
+    lote
+    fabricante
+    data_aplicacao
+    proxima_dose
+    dose
+    responsavel
+    observacoes
+}
+
+entity "LOGS_AUDITORIA" as logs {
+    * id : PK
+    --
+    usuario_id
+    acao
+    detalhes
+    data_hora
+}
+
+usuarios ||--o{ animais : cadastra
+usuarios ||--o{ manejos : registra
+usuarios ||--o{ vacinacoes : registra
+usuarios |o--o{ logs : realiza
+animais ||--o{ manejos : possui
+animais ||--o{ vacinacoes : recebe
+
+@enduml
