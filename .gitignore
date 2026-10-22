@@ -219,3 +219,10 @@ __marimo__/
 mediagro.db
 agrovita_teste.db
 python-dotenv==1.2.4
+
+# Configuracoes locais
+.env
+.env.*
+!.env.example
+# Backup local da migracao
+mediagro-backup-migracao.db
