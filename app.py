@@ -2,17 +2,15 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from datetime import date, datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-import sqlite3 
 import os
+import mysql.connector
+from mysql.connector import Error as MySQLError
 from dotenv import load_dotenv
 
 load_dotenv()
-from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
-from datetime import timedelta
-
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -43,12 +41,67 @@ def verificar_inatividade():
     session["ultima_atividade"] = agora
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CAMINHO_BANCO = os.path.join(BASE_DIR, "mediagro.db")
+
+class CursorMySQL:
+    """Adaptador pequeno para manter a interface de cursor usada pelo Flask."""
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, sql, parametros=()):
+        # mysql-connector usa %s; o código legado do projeto usa ?.
+        self._cursor.execute(sql.replace("?", "%s"), parametros)
+        return self
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    @property
+    def lastrowid(self):
+        return self._cursor.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    def close(self):
+        self._cursor.close()
+
+class ConexaoMySQL:
+    """Oferece execute() e cursores em dicionário para compatibilidade com o app."""
+    def __init__(self):
+        self._conexao = mysql.connector.connect(
+            host=os.getenv("DB_HOST", "localhost"),
+            port=int(os.getenv("DB_PORT", "3306")),
+            database=os.getenv("DB_NAME", "agrovita"),
+            user=os.getenv("DB_USER", "agrovita_app"),
+            password=os.getenv("DB_PASSWORD", ""),
+            charset="utf8mb4",
+            autocommit=False,
+        )
+
+    def cursor(self):
+        return CursorMySQL(self._conexao.cursor(dictionary=True))
+
+    def execute(self, sql, parametros=()):
+        cursor = self.cursor()
+        cursor.execute(sql, parametros)
+        return cursor
+
+    def commit(self):
+        self._conexao.commit()
+
+    def rollback(self):
+        self._conexao.rollback()
+
+    def close(self):
+        self._conexao.close()
 
 def conectar_banco():
-    conexao = sqlite3.connect(CAMINHO_BANCO)
-    conexao.row_factory = sqlite3.Row
-    return conexao
+    """Abre uma conexão com o banco MySQL configurado no .env."""
+    return ConexaoMySQL()
 
 def registrar_log(usuario_id, acao, detalhes=None):
     conexao = conectar_banco()
@@ -64,157 +117,19 @@ def registrar_log(usuario_id, acao, detalhes=None):
         conexao.close()
 
 def criar_tabelas():
+    """Confere a existência do esquema MySQL; não altera nem recria tabelas."""
     conexao = conectar_banco()
-    cursor = conexao.cursor()
-        # Cria a tabela de logs de auditoria
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS logs_auditoria (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id INTEGER,
-            acao TEXT NOT NULL,
-            detalhes TEXT,
-            data_hora TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # Cria a tabela de usuários
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            senha TEXT NOT NULL,
-            tipo TEXT DEFAULT 'usuario'
-        )
-    """)
-
-    # Cria a tabela de animais
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS animais (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            identificacao TEXT NOT NULL,
-            especie TEXT NOT NULL,
-            raca TEXT,
-            data_nascimento TEXT,
-            usuario_id INTEGER,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-        )
-    """)
-
-    # Cria a tabela de manejos sanitários
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS manejos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            animal TEXT NOT NULL,
-            tipo_manejo TEXT NOT NULL,
-            data_manejo TEXT NOT NULL,
-            produto TEXT,
-            dose TEXT,
-            responsavel TEXT,
-            observacoes TEXT,
-            usuario_id INTEGER,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-        )
-    """)
-
-    # Cria a tabela de vacinações
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS vacinacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            animal TEXT NOT NULL,
-            vacina TEXT NOT NULL,
-            lote TEXT,
-            fabricante TEXT,
-            data_aplicacao TEXT NOT NULL,
-            proxima_dose TEXT,
-            dose TEXT,
-            responsavel TEXT,
-            observacoes TEXT,
-            usuario_id INTEGER,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-        )
-    """)
-
-    cursor.execute("PRAGMA table_info(animais)")
-    colunas_animais = [coluna[1] for coluna in cursor.fetchall()]
-
-    if "usuario_id" not in colunas_animais:
-        cursor.execute("""
-            ALTER TABLE animais
-            ADD COLUMN usuario_id INTEGER
-            REFERENCES usuarios(id)
-        """)
-
-    # Adiciona usuario_id em manejos, caso ainda não exista
-    cursor.execute("PRAGMA table_info(manejos)")
-    colunas_manejos = [coluna[1] for coluna in cursor.fetchall()]
-
-    if "usuario_id" not in colunas_manejos:
-        cursor.execute("""
-            ALTER TABLE manejos
-            ADD COLUMN usuario_id INTEGER
-            REFERENCES usuarios(id)
-        """)
-
-    # Adiciona usuario_id em vacinacoes, caso ainda não exista
-    cursor.execute("PRAGMA table_info(vacinacoes)")
-    colunas_vacinacoes = [coluna[1] for coluna in cursor.fetchall()]
-
-    if "usuario_id" not in colunas_vacinacoes:
-        cursor.execute("""
-            ALTER TABLE vacinacoes
-            ADD COLUMN usuario_id INTEGER
-            REFERENCES usuarios(id)
-        """)
-
-    cursor.execute(
-        "SELECT * FROM usuarios WHERE email = ?",
-        ("admin@agrovita.com",)
-    )
-    admin = cursor.fetchone()
-
-    if admin is None:
-        senha_inicial = os.environ.get("ADMIN_INITIAL_PASSWORD")
-
-        if not senha_inicial:
+    try:
+        cursor = conexao.execute("SHOW TABLES")
+        tabelas = {next(iter(linha.values())) for linha in cursor.fetchall()}
+        obrigatorias = {"usuarios", "animais", "manejos", "vacinacoes", "logs_auditoria"}
+        faltantes = obrigatorias - tabelas
+        if faltantes:
             raise RuntimeError(
-                "Configure ADMIN_INITIAL_PASSWORD para criar o administrador inicial."
+                "O banco MySQL não possui as tabelas: " + ", ".join(sorted(faltantes))
             )
-
-        senha_hash = generate_password_hash(senha_inicial)
-
-        cursor.execute("""
-        INSERT INTO usuarios (nome, email, senha, tipo)
-        VALUES (?, ?, ?, ?)
-    """, ("Administrador", "admin@agrovita.com", senha_hash, "admin"))
-
-    cursor.execute(
-        "SELECT id FROM usuarios WHERE email = ?",
-        ("admin@agrovita.com",)
-    )
-    admin_id = cursor.fetchone()["id"]
-    
-
-    cursor.execute("""
-        UPDATE animais
-        SET usuario_id = ?
-        WHERE usuario_id IS NULL
-    """, (admin_id,))
-
-    cursor.execute("""
-        UPDATE manejos
-        SET usuario_id = ?
-        WHERE usuario_id IS NULL
-    """, (admin_id,))
-
-    cursor.execute("""
-        UPDATE vacinacoes
-        SET usuario_id = ?
-        WHERE usuario_id IS NULL
-    """, (admin_id,))
-
-    conexao.commit()
-    conexao.close()
+    finally:
+        conexao.close()
 
 criar_tabelas()
 
@@ -424,152 +339,119 @@ def remover_animal(id, usuario_id):
         conexao.close()
 
 # controle de manejo
+def _resolver_animal_id(conexao, identificacao, usuario_id):
+    """Resolve o ID ou a identificação de um animal pertencente ao usuário."""
+    valor = str(identificacao or "").strip()
+    if not valor:
+        raise ValueError("Selecione um animal válido.")
+
+    # O formulário pode enviar o ID ou a identificação do animal.
+    if valor.isdecimal():
+        animal = conexao.execute(
+            "SELECT id FROM animais WHERE id = ? AND usuario_id = ?",
+            (int(valor), usuario_id),
+        ).fetchone()
+        if animal is not None:
+            return animal["id"]
+
+    animal = conexao.execute(
+        "SELECT id FROM animais WHERE TRIM(identificacao) = TRIM(?) "
+        "AND usuario_id = ? ORDER BY id LIMIT 1",
+        (valor, usuario_id),
+    ).fetchone()
+    if animal is None:
+        raise ValueError(
+            "O animal selecionado não foi encontrado na sua conta. "
+            "Confira se ele está cadastrado para este usuário."
+        )
+    return animal["id"]
+
+
 def criar_manejo(dados, usuario_id):
     conexao = conectar_banco()
-
     try:
+        animal_id = _resolver_animal_id(conexao, dados.get("animal"), usuario_id)
         cursor = conexao.execute("""
-            INSERT INTO manejos (
-                animal,
-                tipo_manejo,
-                data_manejo,
-                produto,
-                dose,
-                responsavel,
-                observacoes,
-                usuario_id
-            )
+            INSERT INTO manejos (animal_id, usuario_id, tipo_manejo, data_manejo,
+                produto, dose, responsavel, observacoes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            dados.get("animal"),
-            dados.get("tipo_manejo"),
-            dados.get("data_manejo"),
-            dados.get("produto"),
-            dados.get("dose"),
-            dados.get("responsavel"),
-            dados.get("observacoes"),
-            usuario_id
-        ))
-
+        """, (animal_id, usuario_id, dados.get("tipo_manejo"), dados.get("data_manejo"),
+              dados.get("produto"), dados.get("dose"), dados.get("responsavel"),
+              dados.get("observacoes")))
         manejo_id = cursor.lastrowid
-
-        conexao.execute("""
-            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-            VALUES (?, ?, ?)
-        """, (
-            usuario_id,
-            "CRIAR_MANEJO",
-            f"Manejo ID {manejo_id} cadastrado"
-        ))
-
+        conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                        (usuario_id, "CRIAR_MANEJO", f"Manejo ID {manejo_id} cadastrado"))
         conexao.commit()
-
     except Exception:
         conexao.rollback()
         raise
-
     finally:
         conexao.close()
 
 
 def listar_manejos(usuario_id):
     conexao = conectar_banco()
-
-    manejos = conexao.execute(
-        "SELECT * FROM manejos WHERE usuario_id = ? ORDER BY id DESC",
-        (usuario_id,)
-    ).fetchall()
-
-    conexao.close()
-    return manejos
+    try:
+        return conexao.execute("""
+            SELECT m.id, m.animal_id, a.identificacao AS animal, m.usuario_id,
+                   m.tipo_manejo, m.data_manejo, m.produto, m.dose,
+                   m.responsavel, m.observacoes
+            FROM manejos m JOIN animais a ON a.id = m.animal_id
+            WHERE m.usuario_id = ? ORDER BY m.id DESC
+        """, (usuario_id,)).fetchall()
+    finally:
+        conexao.close()
 
 
 def buscar_manejo(id, usuario_id):
     conexao = conectar_banco()
-
-    manejo = conexao.execute(
-        "SELECT * FROM manejos WHERE id = ? AND usuario_id = ?",
-        (id, usuario_id)
-    ).fetchone()
-
-    conexao.close()
-    return manejo
+    try:
+        return conexao.execute("""
+            SELECT m.id, m.animal_id, a.identificacao AS animal, m.usuario_id,
+                   m.tipo_manejo, m.data_manejo, m.produto, m.dose,
+                   m.responsavel, m.observacoes
+            FROM manejos m JOIN animais a ON a.id = m.animal_id
+            WHERE m.id = ? AND m.usuario_id = ?
+        """, (id, usuario_id)).fetchone()
+    finally:
+        conexao.close()
 
 
 def atualizar_manejo(id, dados, usuario_id):
     conexao = conectar_banco()
-
     try:
+        animal_id = _resolver_animal_id(conexao, dados.get("animal"), usuario_id)
         cursor = conexao.execute("""
-            UPDATE manejos
-            SET animal = ?,
-                tipo_manejo = ?,
-                data_manejo = ?,
-                produto = ?,
-                dose = ?,
-                responsavel = ?,
-                observacoes = ?
+            UPDATE manejos SET animal_id = ?, tipo_manejo = ?, data_manejo = ?,
+                produto = ?, dose = ?, responsavel = ?, observacoes = ?
             WHERE id = ? AND usuario_id = ?
-        """, (
-            dados.get("animal"),
-            dados.get("tipo_manejo"),
-            dados.get("data_manejo"),
-            dados.get("produto"),
-            dados.get("dose"),
-            dados.get("responsavel"),
-            dados.get("observacoes"),
-            id,
-            usuario_id
-        ))
-
+        """, (animal_id, dados.get("tipo_manejo"), dados.get("data_manejo"),
+              dados.get("produto"), dados.get("dose"), dados.get("responsavel"),
+              dados.get("observacoes"), id, usuario_id))
         if cursor.rowcount > 0:
-            conexao.execute("""
-                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-                VALUES (?, ?, ?)
-            """, (
-                usuario_id,
-                "EDITAR_MANEJO",
-                f"Manejo ID {id} atualizado"
-            ))
-
+            conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                            (usuario_id, "EDITAR_MANEJO", f"Manejo ID {id} atualizado"))
         conexao.commit()
-
     except Exception:
         conexao.rollback()
         raise
-
     finally:
         conexao.close()
 
 
 def remover_manejo(id, usuario_id):
     conexao = conectar_banco()
-
     try:
-        cursor = conexao.execute(
-            "DELETE FROM manejos WHERE id = ? AND usuario_id = ?",
-            (id, usuario_id)
-        )
-
+        cursor = conexao.execute("DELETE FROM manejos WHERE id = ? AND usuario_id = ?", (id, usuario_id))
         if cursor.rowcount > 0:
-            conexao.execute("""
-                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-                VALUES (?, ?, ?)
-            """, (
-                usuario_id,
-                "EXCLUIR_MANEJO",
-                f"Manejo ID {id} excluído"
-            ))
-
+            conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                            (usuario_id, "EXCLUIR_MANEJO", f"Manejo ID {id} excluído"))
         conexao.commit()
-
     except Exception:
         conexao.rollback()
         raise
-
     finally:
         conexao.close()
-
 
 
 def login_required(f):
@@ -786,7 +668,11 @@ def manejo():
             flash("Informe uma data de manejo válida.", "erro")
             return render_template("manejo.html")
 
-        criar_manejo(dados, session["usuario_id"])
+        try:
+            criar_manejo(dados, session["usuario_id"])
+        except ValueError as erro:
+            flash(str(erro), "erro")
+            return render_template("manejo.html")
         flash("Manejo cadastrado com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
@@ -823,7 +709,11 @@ def atualizar_manejo_route(id):
             flash("Informe uma data de manejo válida.", "erro")
             return render_template("manejo.html", registro=registro)
 
-        atualizar_manejo(id, dados, session["usuario_id"])
+        try:
+            atualizar_manejo(id, dados, session["usuario_id"])
+        except ValueError as erro:
+            flash(str(erro), "erro")
+            return render_template("manejo.html", registro=registro)
         flash("Manejo atualizado com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
@@ -851,165 +741,93 @@ def listagem():
     
 def criar_vacinacao(dados, usuario_id):
     conexao = conectar_banco()
-
     try:
+        animal_id = _resolver_animal_id(conexao, dados.get("animal"), usuario_id)
         cursor = conexao.execute("""
-            INSERT INTO vacinacoes (
-                animal,
-                vacina,
-                lote,
-                fabricante,
-                data_aplicacao,
-                proxima_dose,
-                dose,
-                responsavel,
-                observacoes,
-                usuario_id
-            )
+            INSERT INTO vacinacoes (animal_id, usuario_id, vacina, lote, fabricante,
+                data_aplicacao, proxima_dose, dose, responsavel, observacoes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            dados.get("animal"),
-            dados.get("vacina"),
-            dados.get("lote"),
-            dados.get("fabricante"),
-            dados.get("data_aplicacao"),
-            dados.get("proxima_dose"),
-            dados.get("dose"),
-            dados.get("responsavel"),
-            dados.get("observacoes"),
-            usuario_id
-        ))
-
+        """, (animal_id, usuario_id, dados.get("vacina"), dados.get("lote"),
+              dados.get("fabricante"), dados.get("data_aplicacao"), dados.get("proxima_dose"),
+              dados.get("dose"), dados.get("responsavel"), dados.get("observacoes")))
         vacinacao_id = cursor.lastrowid
-
-        conexao.execute("""
-            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-            VALUES (?, ?, ?)
-        """, (
-            usuario_id,
-            "CRIAR_VACINACAO",
-            f"Vacinação ID {vacinacao_id} cadastrada"
-        ))
-
+        conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                        (usuario_id, "CRIAR_VACINACAO", f"Vacinação ID {vacinacao_id} cadastrada"))
         conexao.commit()
-
     except Exception:
         conexao.rollback()
         raise
-
     finally:
         conexao.close()
 
 
 def listar_vacinacoes(usuario_id):
     conexao = conectar_banco()
-
-    registros = conexao.execute(
-        "SELECT * FROM vacinacoes WHERE usuario_id = ?",
-        (usuario_id,)
-    ).fetchall()
-
-    conexao.close()
-
-    vacinacoes = []
-
-    for registro in registros:
-        vacinacao = dict(registro)
-        vacinacao["status"] = status_vacina(
-            vacinacao.get("proxima_dose")
-        )
-        vacinacoes.append(vacinacao)
-
-    return vacinacoes
+    try:
+        registros = conexao.execute("""
+            SELECT v.id, v.animal_id, a.identificacao AS animal, v.usuario_id,
+                   v.vacina, v.lote, v.fabricante, v.data_aplicacao, v.proxima_dose,
+                   v.dose, v.responsavel, v.observacoes
+            FROM vacinacoes v JOIN animais a ON a.id = v.animal_id
+            WHERE v.usuario_id = ? ORDER BY v.id DESC
+        """, (usuario_id,)).fetchall()
+        vacinacoes = []
+        for registro in registros:
+            vacinacao = dict(registro)
+            vacinacao["status"] = status_vacina(vacinacao.get("proxima_dose"))
+            vacinacoes.append(vacinacao)
+        return vacinacoes
+    finally:
+        conexao.close()
 
 
 def buscar_vacinacao(id, usuario_id):
     conexao = conectar_banco()
-
-    vacinacao = conexao.execute(
-        "SELECT * FROM vacinacoes WHERE id = ? AND usuario_id = ?",
-        (id, usuario_id)
-    ).fetchone()
-
-    conexao.close()
-    return vacinacao
+    try:
+        return conexao.execute("""
+            SELECT v.id, v.animal_id, a.identificacao AS animal, v.usuario_id,
+                   v.vacina, v.lote, v.fabricante, v.data_aplicacao, v.proxima_dose,
+                   v.dose, v.responsavel, v.observacoes
+            FROM vacinacoes v JOIN animais a ON a.id = v.animal_id
+            WHERE v.id = ? AND v.usuario_id = ?
+        """, (id, usuario_id)).fetchone()
+    finally:
+        conexao.close()
 
 
 def atualizar_vacinacao(id, dados, usuario_id):
     conexao = conectar_banco()
-
     try:
+        animal_id = _resolver_animal_id(conexao, dados.get("animal"), usuario_id)
         cursor = conexao.execute("""
-            UPDATE vacinacoes
-            SET animal = ?,
-                vacina = ?,
-                lote = ?,
-                fabricante = ?,
-                data_aplicacao = ?,
-                proxima_dose = ?,
-                dose = ?,
-                responsavel = ?,
-                observacoes = ?
+            UPDATE vacinacoes SET animal_id = ?, vacina = ?, lote = ?, fabricante = ?,
+                data_aplicacao = ?, proxima_dose = ?, dose = ?, responsavel = ?, observacoes = ?
             WHERE id = ? AND usuario_id = ?
-        """, (
-            dados.get("animal"),
-            dados.get("vacina"),
-            dados.get("lote"),
-            dados.get("fabricante"),
-            dados.get("data_aplicacao"),
-            dados.get("proxima_dose"),
-            dados.get("dose"),
-            dados.get("responsavel"),
-            dados.get("observacoes"),
-            id,
-            usuario_id
-        ))
-
+        """, (animal_id, dados.get("vacina"), dados.get("lote"), dados.get("fabricante"),
+              dados.get("data_aplicacao"), dados.get("proxima_dose"), dados.get("dose"),
+              dados.get("responsavel"), dados.get("observacoes"), id, usuario_id))
         if cursor.rowcount > 0:
-            conexao.execute("""
-                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-                VALUES (?, ?, ?)
-            """, (
-                usuario_id,
-                "EDITAR_VACINACAO",
-                f"Vacinação ID {id} atualizada"
-            ))
-
+            conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                            (usuario_id, "EDITAR_VACINACAO", f"Vacinação ID {id} atualizada"))
         conexao.commit()
-
     except Exception:
         conexao.rollback()
         raise
-
     finally:
         conexao.close()
 
 
 def remover_vacinacao(id, usuario_id):
     conexao = conectar_banco()
-
     try:
-        cursor = conexao.execute(
-            "DELETE FROM vacinacoes WHERE id = ? AND usuario_id = ?",
-            (id, usuario_id)
-        )
-
+        cursor = conexao.execute("DELETE FROM vacinacoes WHERE id = ? AND usuario_id = ?", (id, usuario_id))
         if cursor.rowcount > 0:
-            conexao.execute("""
-                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-                VALUES (?, ?, ?)
-            """, (
-                usuario_id,
-                "EXCLUIR_VACINACAO",
-                f"Vacinação ID {id} excluída"
-            ))
-
+            conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                            (usuario_id, "EXCLUIR_VACINACAO", f"Vacinação ID {id} excluída"))
         conexao.commit()
-
     except Exception:
         conexao.rollback()
         raise
-
     finally:
         conexao.close()
 
@@ -1018,8 +836,8 @@ def status_vacina(proxima_dose):
         return None
 
     try:
-        prox = date.fromisoformat(proxima_dose)
-    except ValueError:
+        prox = proxima_dose if isinstance(proxima_dose, date) else date.fromisoformat(str(proxima_dose))
+    except (ValueError, TypeError):
         return None
 
     hoje = date.today()
@@ -1159,7 +977,15 @@ def atualizar_animal_route(id):
 @app.route("/animais/remover/<int:id>", methods=["POST"])
 @login_required
 def remover_animal_route(id):
-    remover_animal(id, session["usuario_id"])
+    try:
+        remover_animal(id, session["usuario_id"])
+        flash("Animal excluído com sucesso!", "sucesso")
+    except mysql.connector.IntegrityError:
+        flash(
+            "Este animal possui manejos ou vacinações vinculados. "
+            "Exclua primeiro esses registros ou mantenha o animal cadastrado.",
+            "erro",
+        )
     return redirect(url_for("listagem"))
 
 
@@ -1192,7 +1018,11 @@ def vacinacao():
                     flash("Informe datas válidas no formato AAAA-MM-DD.", "erro")
                     return render_template("vacinacao.html")
 
-        criar_vacinacao(dados, session["usuario_id"])
+        try:
+            criar_vacinacao(dados, session["usuario_id"])
+        except ValueError as erro:
+            flash(str(erro), "erro")
+            return render_template("vacinacao.html")
         flash("Vacinação cadastrada com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
@@ -1233,7 +1063,11 @@ def atualizar_vacinacao_route(id):
                     flash("Informe datas válidas no formato AAAA-MM-DD.", "erro")
                     return render_template("vacinacao.html", registro=registro)
 
-        atualizar_vacinacao(id, dados, session["usuario_id"])
+        try:
+            atualizar_vacinacao(id, dados, session["usuario_id"])
+        except ValueError as erro:
+            flash(str(erro), "erro")
+            return render_template("vacinacao.html", registro=registro)
         flash("Vacinação atualizada com sucesso!", "sucesso")
         return redirect(url_for("listagem"))
 
@@ -1363,153 +1197,117 @@ def validar_dados_api(recurso, dados):
 def api_colecao(recurso):
     if recurso not in API_RECURSOS:
         return jsonify({"erro": "Recurso não encontrado."}), 404
-
     usuario_id = session["usuario_id"]
     config = API_RECURSOS[recurso]
     conexao = conectar_banco()
-
     try:
         if request.method == "GET":
-            registros = conexao.execute(
-                f"SELECT * FROM {recurso} WHERE usuario_id = ?",
-                (usuario_id,)
-            ).fetchall()
-
+            if recurso in ("manejos", "vacinacoes"):
+                alias = "m" if recurso == "manejos" else "v"
+                registros = conexao.execute(
+                    f"SELECT {alias}.*, a.identificacao AS animal FROM {recurso} {alias} "
+                    f"JOIN animais a ON a.id = {alias}.animal_id WHERE {alias}.usuario_id = ?",
+                    (usuario_id,)).fetchall()
+            else:
+                registros = conexao.execute(f"SELECT * FROM {recurso} WHERE usuario_id = ?", (usuario_id,)).fetchall()
             return jsonify([dict(registro) for registro in registros]), 200
 
         dados = request.get_json(silent=True)
         erro = validar_dados_api(recurso, dados)
-
         if erro:
             return jsonify({"erro": erro}), 400
 
         colunas = config["colunas"]
         valores = [dados.get(campo) or None for campo in colunas]
-
         nomes_sql = ", ".join(colunas)
         marcadores = ", ".join("?" for _ in colunas)
-
+        if recurso in ("manejos", "vacinacoes"):
+            animal_id = _resolver_animal_id(conexao, dados.get("animal"), usuario_id)
+            nomes_sql = nomes_sql.replace("animal", "animal_id", 1)
+            valores[0] = animal_id
         cursor = conexao.execute(
-            f"""
-            INSERT INTO {recurso} ({nomes_sql}, usuario_id)
-            VALUES ({marcadores}, ?)
-            """,
-            (*valores, usuario_id)
-        )
-
+            f"INSERT INTO {recurso} ({nomes_sql}, usuario_id) VALUES ({marcadores}, ?)",
+            (*valores, usuario_id))
         registro_id = cursor.lastrowid
-
-        conexao.execute(
-            """
-            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-            VALUES (?, ?, ?)
-            """,
-            (
-                usuario_id,
-                f"CRIAR_{recurso.upper()}",
-                f"Registro ID {registro_id} criado pela API"
-            )
-        )
-
+        conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                        (usuario_id, f"CRIAR_{recurso.upper()}", f"Registro ID {registro_id} criado pela API"))
         conexao.commit()
-
-        registro = conexao.execute(
-            f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?",
-            (registro_id, usuario_id)
-        ).fetchone()
-
+        if recurso in ("manejos", "vacinacoes"):
+            alias = "m" if recurso == "manejos" else "v"
+            registro = conexao.execute(
+                f"SELECT {alias}.*, a.identificacao AS animal FROM {recurso} {alias} "
+                f"JOIN animais a ON a.id = {alias}.animal_id WHERE {alias}.id = ? AND {alias}.usuario_id = ?",
+                (registro_id, usuario_id)).fetchone()
+        else:
+            registro = conexao.execute(f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?", (registro_id, usuario_id)).fetchone()
         return jsonify(dict(registro)), 201
-
+    except ValueError as erro:
+        conexao.rollback()
+        return jsonify({"erro": str(erro)}), 400
     finally:
         conexao.close()
 
 
-@app.route("/api/<string:recurso>/<int:registro_id>",methods=["GET", "PUT", "DELETE"])
+@app.route("/api/<string:recurso>/<int:registro_id>", methods=["GET", "PUT", "DELETE"])
 @login_required
 def api_registro(recurso, registro_id):
     if recurso not in API_RECURSOS:
         return jsonify({"erro": "Recurso não encontrado."}), 404
-
     usuario_id = session["usuario_id"]
     config = API_RECURSOS[recurso]
     conexao = conectar_banco()
-
     try:
-        registro = conexao.execute(
-            f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?",
-            (registro_id, usuario_id)
-        ).fetchone()
-
+        if recurso in ("manejos", "vacinacoes"):
+            alias = "m" if recurso == "manejos" else "v"
+            registro = conexao.execute(
+                f"SELECT {alias}.*, a.identificacao AS animal FROM {recurso} {alias} "
+                f"JOIN animais a ON a.id = {alias}.animal_id WHERE {alias}.id = ? AND {alias}.usuario_id = ?",
+                (registro_id, usuario_id)).fetchone()
+        else:
+            registro = conexao.execute(f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?", (registro_id, usuario_id)).fetchone()
         if registro is None:
             return jsonify({"erro": "Registro não encontrado."}), 404
-
         if request.method == "GET":
             return jsonify(dict(registro)), 200
-
         if request.method == "DELETE":
-            conexao.execute(
-                f"DELETE FROM {recurso} WHERE id = ? AND usuario_id = ?",
-                (registro_id, usuario_id)
-            )
-
-            conexao.execute(
-                """
-                INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-                VALUES (?, ?, ?)
-                """,
-                (
-                    usuario_id,
-                    f"EXCLUIR_{recurso.upper()}",
-                    f"Registro ID {registro_id} excluído pela API"
-                )
-            )
-
+            conexao.execute(f"DELETE FROM {recurso} WHERE id = ? AND usuario_id = ?", (registro_id, usuario_id))
+            conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                            (usuario_id, f"EXCLUIR_{recurso.upper()}", f"Registro ID {registro_id} excluído pela API"))
             conexao.commit()
             return jsonify({"mensagem": "Registro excluído com sucesso."}), 200
 
         dados = request.get_json(silent=True)
         erro = validar_dados_api(recurso, dados)
-
         if erro:
             return jsonify({"erro": erro}), 400
-
         colunas = config["colunas"]
-        atribuicoes = ", ".join(f"{campo} = ?" for campo in colunas)
         valores = [dados.get(campo) or None for campo in colunas]
-
-        conexao.execute(
-            f"""
-            UPDATE {recurso}
-            SET {atribuicoes}
-            WHERE id = ? AND usuario_id = ?
-            """,
-            (*valores, registro_id, usuario_id)
-        )
-
-        conexao.execute(
-            """
-            INSERT INTO logs_auditoria (usuario_id, acao, detalhes)
-            VALUES (?, ?, ?)
-            """,
-            (
-                usuario_id,
-                f"ATUALIZAR_{recurso.upper()}",
-                f"Registro ID {registro_id} atualizado pela API"
-            )
-        )
-
+        if recurso in ("manejos", "vacinacoes"):
+            valores[0] = _resolver_animal_id(conexao, dados.get("animal"), usuario_id)
+            colunas_sql = ["animal_id", *colunas[1:]]
+        else:
+            colunas_sql = list(colunas)
+        atribuicoes = ", ".join(f"{campo} = ?" for campo in colunas_sql)
+        conexao.execute(f"UPDATE {recurso} SET {atribuicoes} WHERE id = ? AND usuario_id = ?",
+                        (*valores, registro_id, usuario_id))
+        conexao.execute("INSERT INTO logs_auditoria (usuario_id, acao, detalhes) VALUES (?, ?, ?)",
+                        (usuario_id, f"ATUALIZAR_{recurso.upper()}", f"Registro ID {registro_id} atualizado pela API"))
         conexao.commit()
-
-        atualizado = conexao.execute(
-            f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?",
-            (registro_id, usuario_id)
-        ).fetchone()
-
+        if recurso in ("manejos", "vacinacoes"):
+            alias = "m" if recurso == "manejos" else "v"
+            atualizado = conexao.execute(
+                f"SELECT {alias}.*, a.identificacao AS animal FROM {recurso} {alias} "
+                f"JOIN animais a ON a.id = {alias}.animal_id WHERE {alias}.id = ? AND {alias}.usuario_id = ?",
+                (registro_id, usuario_id)).fetchone()
+        else:
+            atualizado = conexao.execute(f"SELECT * FROM {recurso} WHERE id = ? AND usuario_id = ?", (registro_id, usuario_id)).fetchone()
         return jsonify(dict(atualizado)), 200
-
+    except ValueError as erro:
+        conexao.rollback()
+        return jsonify({"erro": str(erro)}), 400
     finally:
         conexao.close()
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true")
