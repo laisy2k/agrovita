@@ -2,7 +2,7 @@
 
 ## 1. Introdução
 
-O AgroVita é um sistema web desenvolvido em Python, utilizando Flask e SQLite, para o gerenciamento de animais, manejos sanitários e vacinações.
+O AgroVita é um sistema web desenvolvido em Python, utilizando Flask e MySQL, para o gerenciamento de animais, manejos sanitários e vacinações.
 
 Foram implementados três conjuntos de mecanismos de segurança para proteger o acesso ao sistema, controlar sessões e registrar atividades dos usuários.
 
@@ -41,7 +41,7 @@ Foram implementados mecanismos de encerramento da sessão no logout, expiração
 
 ### 2.3. Logs de auditoria
 
-Foi criada a tabela `logs_auditoria` no banco de dados SQLite para armazenar informações sobre ações realizadas no sistema.
+A tabela logs_auditoria no banco de dados MySQL armazena informações sobre ações realizadas no sistema.
 
 Os registros incluem o identificador do usuário, o tipo da ação, detalhes do evento e a data e hora.
 
@@ -82,7 +82,7 @@ Os testes funcionais realizados não apresentaram falhas nos cenários avaliados
 
 - Python
 - Flask
-- SQLite
+- MySQL
 - Werkzeug para geração e verificação de hashes de senhas
 - Sessões e cookies HTTP
 - Consultas SQL parametrizadas
