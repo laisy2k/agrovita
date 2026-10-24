@@ -12,7 +12,7 @@ entity "usuarios" as usuarios {
     nome : VARCHAR(100) NOT NULL
     email : VARCHAR(150) NOT NULL UNIQUE
     senha : VARCHAR(255) NOT NULL
-    tipo : VARCHAR(20) NOT NULL
+    tipo : VARCHAR(20) NOT NULL DEFAULT 'usuario'
 }
 
 entity "animais" as animais {
@@ -59,14 +59,14 @@ entity "logs_auditoria" as logs {
     usuario_id : BIGINT NULL <<FK>>
     acao : VARCHAR(100) NOT NULL
     detalhes : TEXT NULL
-    data_hora : DATETIME NOT NULL
+    data_hora : DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 }
 
-usuarios ||--o{ animais : cadastra
-usuarios ||--o{ manejos : registra
-usuarios ||--o{ vacinacoes : registra
-usuarios |o--o{ logs : realiza
-animais ||--o{ manejos : possui
-animais ||--o{ vacinacoes : recebe
+usuarios ||--o{ animais : cadastra (DELETE NO ACTION)
+usuarios ||--o{ manejos : registra (DELETE NO ACTION)
+usuarios ||--o{ vacinacoes : registra (DELETE NO ACTION)
+usuarios |o--o{ logs : realiza (DELETE SET NULL)
+animais ||--o{ manejos : possui (DELETE NO ACTION)
+animais ||--o{ vacinacoes : recebe (DELETE NO ACTION)
 
 @enduml
