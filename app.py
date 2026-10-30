@@ -3,8 +3,7 @@ from datetime import date, datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import os
-import mysql.connector
-from mysql.connector import Error as MySQLError
+import sqlite3
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -40,68 +39,26 @@ def verificar_inatividade():
 
     session["ultima_atividade"] = agora
 
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-class CursorMySQL:
-    """Adaptador pequeno para manter a interface de cursor usada pelo Flask."""
-    def __init__(self, cursor):
-        self._cursor = cursor
+# Banco SQLite
+PASTA_BANCO = os.path.join(BASE_DIR, "instance")
+os.makedirs(PASTA_BANCO, exist_ok=True)
 
-    def execute(self, sql, parametros=()):
-        # mysql-connector usa %s; o código legado do projeto usa ?.
-        self._cursor.execute(sql.replace("?", "%s"), parametros)
-        return self
+DB_PATH = os.getenv(
+    "DATABASE_PATH",
+    os.path.join(PASTA_BANCO, "agrovita.db")
+)
 
-    def fetchone(self):
-        return self._cursor.fetchone()
-
-    def fetchall(self):
-        return self._cursor.fetchall()
-
-    @property
-    def lastrowid(self):
-        return self._cursor.lastrowid
-
-    @property
-    def rowcount(self):
-        return self._cursor.rowcount
-
-    def close(self):
-        self._cursor.close()
-
-class ConexaoMySQL:
-    """Oferece execute() e cursores em dicionário para compatibilidade com o app."""
-    def __init__(self):
-        self._conexao = mysql.connector.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            port=int(os.getenv("DB_PORT", "3306")),
-            database=os.getenv("DB_NAME", "agrovita"),
-            user=os.getenv("DB_USER", "agrovita_app"),
-            password=os.getenv("DB_PASSWORD", ""),
-            charset="utf8mb4",
-            autocommit=False,
-        )
-
-    def cursor(self):
-        return CursorMySQL(self._conexao.cursor(dictionary=True))
-
-    def execute(self, sql, parametros=()):
-        cursor = self.cursor()
-        cursor.execute(sql, parametros)
-        return cursor
-
-    def commit(self):
-        self._conexao.commit()
-
-    def rollback(self):
-        self._conexao.rollback()
-
-    def close(self):
-        self._conexao.close()
 
 def conectar_banco():
-    """Abre uma conexão com o banco MySQL configurado no .env."""
-    return ConexaoMySQL()
+    """Abre uma conexão com o banco SQLite."""
+    conexao = sqlite3.connect(DB_PATH, timeout=20)
+    conexao.row_factory = sqlite3.Row
+    conexao.execute("PRAGMA foreign_keys = ON")
+    return conexao
+
 
 def registrar_log(usuario_id, acao, detalhes=None):
     conexao = conectar_banco()
@@ -116,22 +73,84 @@ def registrar_log(usuario_id, acao, detalhes=None):
     finally:
         conexao.close()
 
+
 def criar_tabelas():
-    """Confere a existência do esquema MySQL; não altera nem recria tabelas."""
+    """Cria as tabelas do AgroVita caso ainda não existam."""
     conexao = conectar_banco()
+
     try:
-        cursor = conexao.execute("SHOW TABLES")
-        tabelas = {next(iter(linha.values())) for linha in cursor.fetchall()}
-        obrigatorias = {"usuarios", "animais", "manejos", "vacinacoes", "logs_auditoria"}
-        faltantes = obrigatorias - tabelas
-        if faltantes:
-            raise RuntimeError(
-                "O banco MySQL não possui as tabelas: " + ", ".join(sorted(faltantes))
-            )
+        conexao.executescript("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                senha TEXT NOT NULL,
+                tipo TEXT NOT NULL DEFAULT 'usuario'
+            );
+
+            CREATE TABLE IF NOT EXISTS animais (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                identificacao TEXT NOT NULL,
+                especie TEXT NOT NULL,
+                raca TEXT,
+                data_nascimento TEXT,
+                usuario_id INTEGER NOT NULL,
+                FOREIGN KEY (usuario_id)
+                    REFERENCES usuarios(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS manejos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_id INTEGER NOT NULL,
+                usuario_id INTEGER NOT NULL,
+                tipo_manejo TEXT NOT NULL,
+                data_manejo TEXT NOT NULL,
+                produto TEXT,
+                dose TEXT,
+                responsavel TEXT NOT NULL,
+                observacoes TEXT,
+                FOREIGN KEY (animal_id)
+                    REFERENCES animais(id),
+                FOREIGN KEY (usuario_id)
+                    REFERENCES usuarios(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS vacinacoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                animal_id INTEGER NOT NULL,
+                usuario_id INTEGER NOT NULL,
+                vacina TEXT NOT NULL,
+                lote TEXT,
+                fabricante TEXT,
+                data_aplicacao TEXT NOT NULL,
+                proxima_dose TEXT,
+                dose TEXT,
+                responsavel TEXT,
+                observacoes TEXT,
+                FOREIGN KEY (animal_id)
+                    REFERENCES animais(id),
+                FOREIGN KEY (usuario_id)
+                    REFERENCES usuarios(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS logs_auditoria (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario_id INTEGER,
+                acao TEXT NOT NULL,
+                detalhes TEXT,
+                data_hora TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (usuario_id)
+                    REFERENCES usuarios(id)
+                    ON DELETE SET NULL
+            );
+        """)
+        conexao.commit()
     finally:
         conexao.close()
 
+
 criar_tabelas()
+
 
 
 # controle de animais
@@ -516,7 +535,6 @@ def admin_required(f):
     return decorated_function
 
 @app.route("/cadastro-usuario", methods=["GET", "POST"])
-@admin_required
 def cadastro_usuario():
     if request.method == "POST":
         nome = request.form.get("nome", "").strip()
@@ -724,6 +742,7 @@ def atualizar_manejo_route(id):
 @login_required
 def remover_manejo_route(id):
     remover_manejo(id, session["usuario_id"])
+    flash("Manejo excluído com sucesso!", "sucesso")
     return redirect(url_for("listagem"))
 
 # Atualize a rota de listagem existente para enviar também os manejos
@@ -858,11 +877,12 @@ def inicio():
     total_manejos = len(listar_manejos(session["usuario_id"]))
 
     return render_template(
-        "index.html",
-        total_animais=total_animais,
-        total_vacinacoes=total_vacinacoes,
-        total_manejos=total_manejos
-    )
+    "index.html",
+    total_animais=total_animais,
+    total_vacinacoes=total_vacinacoes,
+    total_manejos=total_manejos,
+    nome_usuario=session.get("usuario_nome", "usuário")
+)
 
 
 # Cadastro de animal
@@ -980,7 +1000,7 @@ def remover_animal_route(id):
     try:
         remover_animal(id, session["usuario_id"])
         flash("Animal excluído com sucesso!", "sucesso")
-    except mysql.connector.IntegrityError:
+    except sqlite3.IntegrityError:
         flash(
             "Este animal possui manejos ou vacinações vinculados. "
             "Exclua primeiro esses registros ou mantenha o animal cadastrado.",
@@ -1077,6 +1097,7 @@ def atualizar_vacinacao_route(id):
 @login_required
 def remover_vacinacao_route(id):
     remover_vacinacao(id, session["usuario_id"])
+    flash("Vacinação excluída com sucesso!", "sucesso")
     return redirect(url_for("listagem"))
 
 @app.route("/dashboard")

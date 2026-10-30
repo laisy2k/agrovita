@@ -218,7 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 mediagro.db
 agrovita_teste.db
-python-dotenv==1.2.4
 
 # Configuracoes locais
 .env
@@ -226,3 +225,7 @@ python-dotenv==1.2.4
 !.env.example
 # Backup local da migracao
 mediagro-backup-migracao.db
+
+# Bancos de dados locais
+*.db
+*.db-journal
